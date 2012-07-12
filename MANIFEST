@@ -14,6 +14,7 @@ t/00-load.t
 t/01-setup.t
 t/02-check-acls.t
 t/02-check-jira.t
+t/02-externals.t
 t/author-critic.t
 t/release-kwalitee.t
 t/release-pod-coverage.t

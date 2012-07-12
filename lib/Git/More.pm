@@ -3,7 +3,7 @@ use warnings;
 
 package Git::More;
 {
-  $Git::More::VERSION = '0.001';
+  $Git::More::VERSION = '0.002';
 }
 # ABSTRACT: An extension of Git with some goodies for hook developers.
 use App::gh::Git;
@@ -80,6 +80,7 @@ sub get_commit_msg {
     return $body;
 }
 
+
 1;
 
 __END__
@@ -91,7 +92,7 @@ Git::More - An extension of Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.001
+version 0.002
 
 =head1 SYNOPSIS
 
@@ -195,13 +196,17 @@ codes are explained in the C<git help rev-list> document):
 This method returns the commit message (aka body) of the commit
 identified by COMMIT_ID. The result is a string.
 
+=head1 SEE ALSO
+
+    C<App::gh::Git>.
+
 =head1 AUTHOR
 
 Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2012 by Gustavo L. de M. Chaves.
+This software is copyright (c) 2012 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
