@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.002';
+  $Git::Hooks::VERSION = '0.003';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -171,10 +171,11 @@ sub run_hook {
 	# finally, the Git::Hooks standard hooks directory.
 	unshift @{$config->{plugins}}, 'githooks';
 	push    @{$config->{plugins}}, catfile(dirname($INC{'Git/Hooks.pm'}), 'Hooks');
+	my @plugin_dirs = grep {-d} @{$config->{plugins}};
 
+      HOOK:
 	foreach my $hook (@$enabled_hooks) {
-	    my $found = 0;
-	    foreach my $dir (grep {-d} @{$config->{plugins}}) {
+	    foreach my $dir (@plugin_dirs) {
 		my $script = catfile($dir, $hook);
 		next unless -f $script;
 
@@ -184,9 +185,9 @@ sub run_hook {
 		    die __PACKAGE__, ": couldn't do $script: $!\n"    unless defined $exit;
 		    die __PACKAGE__, ": couldn't run $script\n"       unless $exit;
 		}
-		$found = 1;
+		next HOOK;
 	    }
-	    die __PACKAGE__, ": can't find hook enabled hook $hook.\n" unless $found;
+	    die __PACKAGE__, ": can't find hook enabled hook $hook.\n";
 	}
 
 	# Call every hook function installed by the hook scripts before.
@@ -222,7 +223,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.002
+version 0.003
 
 =head1 SYNOPSIS
 
@@ -359,13 +360,13 @@ for nothing.)
 As is, the script won't do anything. You have to implement some hooks
 in it, use some of the existing plugins, or set up some external
 plugins to be invoked properly. Either way, the script should end with
-a call to C<run_hooks> passing to it the name with which it was called
+a call to C<run_hook> passing to it the name with which it was called
 (C<$0>) and all the arguments it received (C<@ARGV>).
 
 =head2 Implementing Hooks
 
 Implement hooks using one of the hook I<directives> described in the
-MAIN METHODS section. For example:
+HOOK DIRECTIVES section. For example:
 
     # Check if every added/updated file is smaller than a fixed limit.
 
@@ -440,8 +441,8 @@ documentation is explicit about this.
 
 Since the default Git hook scripts are taken by the Git::Hooks driver
 script, you must install your external hooks somewhere else. By
-default, the external plugin will look for external hook scripts in
-the directory C<.git/hooks.d> (which you must create) under the
+default, the C<run_hook> routine will look for external hook scripts
+in the directory C<.git/hooks.d> (which you must create) under the
 repository. Below this directory you should have another level of
 directories, named after the default hook names, under which you can
 drop your external hooks.

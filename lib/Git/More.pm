@@ -3,11 +3,10 @@ use warnings;
 
 package Git::More;
 {
-  $Git::More::VERSION = '0.002';
+  $Git::More::VERSION = '0.003';
 }
-# ABSTRACT: An extension of Git with some goodies for hook developers.
-use App::gh::Git;
-use parent -norequire, 'Git';
+# ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
+use parent 'App::gh::Git';
 
 use Error qw(:try);
 use Carp;
@@ -88,11 +87,11 @@ __END__
 
 =head1 NAME
 
-Git::More - An extension of Git with some goodies for hook developers.
+Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.002
+version 0.003
 
 =head1 SYNOPSIS
 
@@ -107,9 +106,8 @@ version 0.002
 
 =head1 DESCRIPTION
 
-This is an extension of the Git class implemented by the
-C<App::gh::Git> module. It's meant to implement a few extra methods
-commonly needed by Git hook developers.
+This is an extension of the C<App::gh::Git> class. It's meant to
+implement a few extra methods commonly needed by Git hook developers.
 
 In particular, it's used by the standard hooks implemented by the
 C<Git::Hooks> framework.
@@ -198,7 +196,7 @@ identified by COMMIT_ID. The result is a string.
 
 =head1 SEE ALSO
 
-    C<App::gh::Git>.
+C<App::gh::Git>
 
 =head1 AUTHOR
 
