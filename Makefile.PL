@@ -36,11 +36,13 @@ my %WriteMakefileArgs = (
     "Exporter" => 0,
     "File::Basename" => 0,
     "File::Spec::Functions" => 0,
+    "JIRA::Client" => 0,
+    "List::MoreUtils" => 0,
     "parent" => 0,
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.003",
+  "VERSION" => "0.004",
   "test" => {
     "TESTS" => "t/*.t"
   }

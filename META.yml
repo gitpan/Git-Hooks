@@ -28,6 +28,8 @@ requires:
   Exporter: 0
   File::Basename: 0
   File::Spec::Functions: 0
+  JIRA::Client: 0
+  List::MoreUtils: 0
   parent: 0
   perl: 5.010
   strict: 0
@@ -36,4 +38,4 @@ resources:
   bugtracker: https://github.com/gnustavo/Git-Hooks/issues
   homepage: http://search.cpan.org/dist/Git-Hooks/
   repository: git://github.com/gnustavo/Git-Hooks.git
-version: 0.003
+version: 0.004
