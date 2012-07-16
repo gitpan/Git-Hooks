@@ -3,7 +3,7 @@ use warnings;
 
 package Git::More;
 {
-  $Git::More::VERSION = '0.005';
+  $Git::More::VERSION = '0.006';
 }
 # ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
 use parent 'App::gh::Git';
@@ -54,7 +54,7 @@ sub get_commits {
     my ($pipe, $ctx) = $git->command_output_pipe(
 	'rev-list',
 	# See 'git help rev-list' to understand the --pretty argument
-	'--pretty=format:%H%n%T%n%P%n%aN%n%aE%n%ai%n%cN%n%cE%n%ci%n%B%x00',
+	'--pretty=format:%H%n%T%n%P%n%aN%n%aE%n%ai%n%cN%n%cE%n%ci%n%s%n%n%b%x00',
 	"$old_commit..$new_commit");
     {
 	local $/ = "\x00\n";
@@ -91,7 +91,7 @@ Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.005
+version 0.006
 
 =head1 SYNOPSIS
 
