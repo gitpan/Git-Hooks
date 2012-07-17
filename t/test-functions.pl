@@ -45,7 +45,7 @@ EOF
 	state $pathsep = $^O eq 'MSWin32' ? ';' : ':';
 	if (defined $ENV{PERL5LIB} and length $ENV{PERL5LIB}) {
 	    foreach my $path (reverse split "$pathsep", $ENV{PERL5LIB}) {
-		say $fh "use lib '$path';";
+		say $fh "use lib '$path';" if $path;
 	    }
 	}
 
@@ -84,13 +84,24 @@ sub new_repos {
 	say $fh "first line";
     }
 
-    App::gh::Git::command(init => '-q', $repodir);
+    try {
+	App::gh::Git::command(init => '-q', $repodir);
+    } otherwise {
+	my $E = shift;
+	BAIL_OUT("Got error while executing 'git init': $E\n");
+    };
 
     my $repo = Git::More->repository(Directory => $repodir);
     $repo->command(add => $filename);
     $repo->command(commit => '-mx');
 
-    App::gh::Git::command(clone => '-q', '--bare', '--no-hardlinks', $repodir, $clonedir);
+    try {
+	App::gh::Git::command(clone => '-q', '--bare', '--no-hardlinks', $repodir, $clonedir);
+    } otherwise {
+	my $E = shift;
+	BAIL_OUT("Got error while executing 'git clone': $E\n");
+    };
+
 
     my $clone = Git::More->repository(Directory => $clonedir);
 
