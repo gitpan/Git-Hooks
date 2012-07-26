@@ -34,8 +34,4 @@ requires:
   perl: 5.010
   strict: 0
   warnings: 0
-resources:
-  bugtracker: https://github.com/gnustavo/Git-Hooks/issues
-  homepage: http://search.cpan.org/dist/Git-Hooks/
-  repository: git://github.com/gnustavo/Git-Hooks.git
-version: 0.011
+version: 0.012

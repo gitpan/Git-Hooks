@@ -1,5 +1,7 @@
 Revision history for Git-Hooks. -*- text -*-
 
+0.012     2012-07-26 12:11:10 America/Sao_Paulo
+
 0.011     2012-07-25 11:12:01 America/Sao_Paulo
 
 	Improve testing framework.
