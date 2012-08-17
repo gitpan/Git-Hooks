@@ -62,7 +62,7 @@ sub grok_msg_jiras {
     # Grok the JIRA issue keys from the commit log
     state $matchkey = qr/$Config->{matchkey}[-1]/;
     if (exists $Config->{matchlog}) {
-	state $matchlog = is_rx($Config->{matchlog}) ? $Config->{matchlog} : qr/$Config->{matchlog}/;
+	state $matchlog = is_rx($Config->{matchlog}[-1]) ? $Config->{matchlog}[-1] : qr/$Config->{matchlog}[-1]/;
 	if (my ($match) = ($msg =~ $matchlog)) {
 	    return $match =~ /$matchkey/g;
 	} else {
@@ -143,6 +143,7 @@ sub check_commit_msg {
     my ($git, $commit, $ref) = @_;
 
     my @keys = uniq(grok_msg_jiras($commit->{body}));
+    my $nkeys = @keys;
 
     # Filter out JIRAs not belonging to any of the specific projects,
     # if any. We don't care about them.
@@ -153,7 +154,20 @@ sub check_commit_msg {
 
     unless (@keys) {
 	if ($Config->{require}) {
-	    die "$HOOK: commit $commit->{commit} (in $ref) does not cite any valid JIRA:\n$commit->{body}\n";
+	    my $shortid = substr $commit->{commit}, 0, 8;
+	    if (@keys == $nkeys) {
+		die <<EOF;
+$HOOK: commit $shortid (in $ref) does not cite any JIRA in the message:
+$commit->{body}
+EOF
+	    } else {
+		my $projects = join(' ', @{$Config->{project}});
+		die <<EOF;
+$HOOK: commit $shortid (in $ref) does not cite any JIRA from the expected
+$HOOK: projects ($projects) in the message:
+$commit->{body}
+EOF
+	    }
 	} else {
 	    return;
 	}
@@ -201,6 +215,9 @@ COMMIT_MSG {
 
     my $msg = read_file($commit_msg_file);
     defined $msg or die "$HOOK: Can't open file '$commit_msg_file' for reading: $!\n";
+
+    # Remove comment lines from the message file contents.
+    $msg =~ s/\n#[^\n]*//sg;
 
     check_commit_msg(
 	$git,

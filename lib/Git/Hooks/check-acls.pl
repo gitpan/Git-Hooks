@@ -126,6 +126,8 @@ sub match_ref {
     my ($ref, $spec) = @_;
     if ($spec =~ /^\^/) {
 	return 1 if $ref =~ $spec;
+    } elsif ($spec =~ /^!(.*)/) {
+	return 1 if $ref !~ $1;
     } else {
 	return 1 if $ref eq $spec;
     }
@@ -177,10 +179,19 @@ sub check_ref {
 	my ($who, $what, $refspec) = @$acl;
 	next unless match_user($git, $who);
 	next unless match_ref($ref, $refspec);
+	$what =~ /[^CRUD-]/ and die "$HOOK: invalid acl 'what' component ($what).\n";
 	return if index($what, $op) != -1;
     }
 
-    die "$HOOK: you ($myself) cannot change ($op) ref $ref.\n";
+    # Assign meaningful names to op codes.
+    my %op = (
+	C => 'create',
+	R => 'rewind/rebase',
+	U => 'update',
+	D => 'delete',
+    );
+
+    die "$HOOK: you ($myself) cannot $op{$op} ref $ref.\n";
 }
 
 # This routine can act both as an update or a pre-receive hook.
@@ -325,9 +336,11 @@ separated by spaces:
     who what refs
 
 By default, nobody has access to anything, except the above-specified
-admins. During an update, all the ACLs matching the authenticated
-user's name are checked to see if she has authorization to do what she
-wants to specific branches and tags.
+admins. During an update, all the ACLs are processed in the order
+defined by the C<git config --list> command. The first ACL matching
+the authenticated username and the affected reference name (usually a
+branch) defines what operations are allowed. If no ACL matches
+username and reference name, then the operation is denied.
 
 The 'who' component specifies to which users this ACL gives access. It
 can be specified in the same three ways as was explained to the
@@ -356,11 +369,29 @@ Delete an existing ref.
 
 =back
 
+You may specify that the user has B<no> access whatsoever to the
+references by using a single hifen (C<->) as the what component.
+
 The 'refs' component specifies which refs this ACL applies to. It can
-be specified as the complete ref name (e.g. "refs/heads/master") or by
-a regular expression starting with a caret (C<^>), which is kept as
-part of the regexp (e.g. "^refs/heads/fix", meaning any branch which
-name starts with "fix").
+be specified in one of these formats:
+
+=over
+
+=item ^REGEXP
+
+A regular expression anchored at the beginning of the reference name.
+For example, "^refs/heads", meaning every branch.
+
+=item !REGEXP
+
+A negated regular expression. For example, "!^refs/heads/master",
+meaning everything but the master branch.
+
+=item STRING
+
+The complete name of a reference. For example, "refs/heads/master".
+
+=back
 
 =head1 REFERENCES
 

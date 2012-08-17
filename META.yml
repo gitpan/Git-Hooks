@@ -35,7 +35,6 @@ requires:
   strict: 0
   warnings: 0
 resources:
-  bugtracker: https://github.com/gnustavo/Git-Hooks/issues
-  homepage: http://search.cpan.org/dist/Git-Hooks/
-  repository: git://github.com/gnustavo/Git-Hooks.git
-version: 0.013
+  homepage: https://metacpan.org/module/Git::Hooks
+  repository: https://github.com/gnustavo/Git-Hooks.git
+version: 0.014
