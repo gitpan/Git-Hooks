@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.014';
+  $Git::Hooks::VERSION = '0.015';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -223,7 +223,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.014
+version 0.015
 
 =head1 SYNOPSIS
 
