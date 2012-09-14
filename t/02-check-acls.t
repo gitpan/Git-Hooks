@@ -4,7 +4,7 @@ use 5.010;
 use strict;
 use warnings;
 use lib 't';
-use Test::More tests => 23;
+use Test::More tests => 26;
 
 require "test-functions.pl";
 
@@ -21,14 +21,14 @@ sub check_can_push {
 }
 
 sub check_cannot_push {
-    my ($testname, $ref) = @_;
+    my ($testname, $ref, $error) = @_;
     new_commit($repo, $file);
-    test_nok_match($testname, qr/\) cannot \S+ ref /, $repo,
+    test_nok_match($testname, $error || qr/\) cannot \S+ ref /, $repo,
 		   'push', '--tags', $clone->repo_path(), $ref || 'master');
 }
 
 # Enable plugin
-$clone->command(config => 'githooks.update', 'check-acls.pl');
+$clone->command(config => 'githooks.update', 'check-acls');
 
 # Without any specific configuration all pushes are denied
 $ENV{USER} //= 'someone';	# guarantee that the user is known, at least.
@@ -47,8 +47,17 @@ check_can_push('allow if admin user');
 $clone->command(config => '--replace-all', 'check-acls.admin', '^adm');
 check_can_push('allow if admin matches regex');
 
+$clone->command(config => '--replace-all', 'check-acls.userenv', 'eval:x y z');
+check_cannot_push('disallow if userenv cannot eval', 'master', qr/error evaluating userenv value/);
+
+$clone->command(config => '--replace-all', 'check-acls.userenv', 'eval:"nouser"');
+check_cannot_push('disallow if userenv eval to nouser');
+
+$clone->command(config => '--replace-all', 'check-acls.userenv', 'eval:$ENV{ACL_ADMIN}');
+check_can_push('allow if userenv can eval');
+
 # Configure groups
-$clone->command(config => 'check-acls.groups', <<'EOF');
+$clone->command(config => 'githooks.groups', <<'EOF');
 admins1 = admin
 admins = @admins1
 EOF

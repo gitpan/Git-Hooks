@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.015';
+  $Git::Hooks::VERSION = '0.016';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -39,13 +39,18 @@ BEGIN {
     }
 
     @EXPORT      = (@installers, 'run_hook');
-    @EXPORT_OK   = qw/hook_config is_ref_enabled/;
+    @EXPORT_OK   = qw/hook_config is_ref_enabled im_memberof/;
     %EXPORT_TAGS = (utils => \@EXPORT_OK);
+}
+
+sub config {
+    state $config = $Git->get_config();
+    return $config;
 }
 
 sub hook_config {
     my ($plugin) = @_;
-    return $Git->get_config()->{$plugin};
+    return config()->{$plugin};
 }
 
 sub is_ref_enabled {
@@ -149,6 +154,68 @@ sub spawn_external_file {
     }
 }
 
+sub grok_groups_spec {
+    my ($git, $specs, $source) = @_;
+    my %groups;
+    foreach (@$specs) {
+	s/\#.*//;		# strip comments
+	next unless /\S/;	# skip blank lines
+	/^\s*(\w+)\s*=\s*(.+?)\s*$/
+	    or die __PACKAGE__, ": invalid line in group file '$source': $_\n";
+	my ($groupname, $members) = ($1, $2);
+	exists $groups{"\@$groupname"}
+	    and die __PACKAGE__, ": redefinition of group ($groupname) in '$source': $_\n";
+	foreach my $member (split / /, $members) {
+	    if ($member =~ /^\@/) {
+		# group member
+		$groups{"\@$groupname"}{$member} = $groups{$member}
+		    or die __PACKAGE__, ": unknown group ($member) cited in '$source': $_\n";
+	    } else {
+		# user member
+		$groups{"\@$groupname"}{$member} = undef;
+	    }
+	}
+    }
+    return \%groups;
+}
+
+sub grok_groups {
+    my ($git) = @_;
+    state $groups = do {
+	my $config = config();
+	exists $config->{githooks}{groups}
+	    or die __PACKAGE__, ": you have to define the githooks.groups option to use groups.\n";
+	my $option = $config->{githooks}{groups};
+
+	if (my ($groupfile) = ($option->[-1] =~ /^file:(.*)/)) {
+	    my @groupspecs = read_file($groupfile);
+	    defined $groupspecs[0]
+		or die __PACKAGE__, ": can't open groups file ($groupfile): $!\n";
+	    grok_groups_spec($git, \@groupspecs, $groupfile);
+	} else {
+	    my @groupspecs = split /\n/, $option->[-1];
+	    grok_groups_spec($git, \@groupspecs, "githooks.groups");
+	}
+    };
+    return $groups;
+}
+
+sub im_memberof {
+    my ($git, $myself, $groupname) = @_;
+
+    state $groups = grok_groups($git);
+
+    return 0 unless exists $groups->{$groupname};
+
+    my $group = $groups->{$groupname};
+    return 1 if exists $group->{$myself};
+    while (my ($member, $subgroup) = each %$group) {
+	next     unless defined $subgroup;
+	return 1 if     im_memberof($git, $myself, $member);
+    }
+    return 0;
+}
+
 sub run_hook {
     my ($hook_name, @args) = @_;
 
@@ -175,6 +242,7 @@ sub run_hook {
 
       HOOK:
 	foreach my $hook (@$enabled_hooks) {
+	    $hook .= '.pl' if $hook !~ /\.pl$/;
 	    foreach my $dir (@plugin_dirs) {
 		my $script = catfile($dir, $hook);
 		next unless -f $script;
@@ -223,7 +291,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.015
+version 0.016
 
 =head1 SYNOPSIS
 
@@ -255,7 +323,7 @@ options. (More on this later.)
 
 	run_hook($0, @ARGV);
 
-=for Pod::Coverage grok_affected_refs spawn_external_file
+=for Pod::Coverage config grok_affected_refs spawn_external_file grok_groups_spec grok_groups
 
 =head1 INTRODUCTION
 
@@ -522,17 +590,19 @@ To enable a plugin you must register it with one of the above
 options. For instance, if you want to enable the C<check-jira.pl>
 plugin in the C<update> hook, you must do this:
 
-    $ git config --add githooks.update check-jira.pl
+    $ git config --add githooks.update check-jira
+
+(The '.pl' extension in the plugin name is optional.)
 
 Note that you may enable more than one plugin to the same hook. For
 instance:
 
-    $ git config --add githooks.update check-acls.pl
+    $ git config --add githooks.update check-acls
 
 And you may enable the same plugin in more than one hook, if it makes
 sense to do so. For instance:
 
-    $ git config --add githooks.commit-msg check-jira.pl
+    $ git config --add githooks.commit-msg check-jira
 
 =head2 githooks.plugins DIR
 
@@ -568,6 +638,38 @@ external hooks shared by all of your repositories.
 
 Please, see the plugins documentation to know about their own
 configuration options.
+
+=head2 githooks.groups GROUPSPEC
+
+You can define user groups in order to make it easier to configure
+access control plugins. Use this option to tell where to find group
+definitions in one of these ways:
+
+=over
+
+=item file:PATH/TO/FILE
+
+As a text file named by PATH/TO/FILE, which may be absolute or
+relative to the hooks current directory, which is usually the
+repository's root in the server. It's syntax is very simple. Blank
+lines are skipped. The hash (#) character starts a comment that goes
+to the end of the current line. Group definitions are lines like this:
+
+    groupA = userA userB @groupB userC
+
+Each group must be defined in a single line. Spaces are significant
+only between users and group references.
+
+Note that a group can reference other groups by name. To make a group
+reference, simple prefix its name with an at sign (@). Group
+references must reference groups previously defined in the file.
+
+=item GROUPS
+
+If the option's value doesn't start with any of the above prefixes, it
+must contain the group definitions itself.
+
+=back
 
 =head1 MAIN METHOD
 
@@ -707,6 +809,12 @@ REF's NEWCOMMIT to OLDCOMMIT.
 This routine returns the list of commits leading from the affected
 REF's NEWCOMMIT to OLDCOMMIT. The commits are represented by hashes,
 as returned by C<Git::More::get_commits>.
+
+=head2 im_memberof(GIT, USER, GROUPNAME)
+
+This routine tells if USER belongs to GROUPNAME. The groupname is
+looked for in the specification given by the C<githooks.groups>
+configuration variable.
 
 =head1 SEE ALSO
 

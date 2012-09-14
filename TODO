@@ -6,5 +6,13 @@
 
 * Implement the examples in https://github.com/schacon/githooks.
 
-* Implement a git-hooks.groups configuration variable to centralize
-  the group definitions for all plugins.
+* Perhaps implement a kind of DENY for ACL operations, along the lines
+  of NFSv4 ACLs (http://tools.ietf.org/html/rfc5661#section-6). I'm
+  thinking about prefixing the what component with a '!'.
+
+* Use tidyall
+  (http://www.openswartz.com/2012/08/21/one-tidier-to-rule-them-all/).
+
+* Implement equivalents for the following SVN::Hooks
+  (http://search.cpan.org/dist/SVN-Hooks/) plugins: CheckStructure,
+  CheckLog, DenyFilenames, UpdateConfFile.

@@ -43,6 +43,8 @@ sub grok_acls {
 	my @acls;		# This will hold the ACL specs
 	my $option = $Config->{acl} || [];
 	foreach my $acl (@$option) {
+	    # Interpolate environment variables embedded as "{VAR}".
+	    $acl =~ s/{(\w+)}/$ENV{$1}/ige;
 	    push @acls, [split / /, $acl, 3];
 	}
 	\@acls;
@@ -50,72 +52,12 @@ sub grok_acls {
     return $acls;
 }
 
-sub grok_groups_spec {
-    my ($git, $specs, $source) = @_;
-    my %groups;
-    foreach (@$specs) {
-	s/\#.*//;		# strip comments
-	next unless /\S/;	# skip blank lines
-	/^\s*(\w+)\s*=\s*(.+?)\s*$/
-	    or die "$HOOK: invalid line in '$source': $_\n";
-	my ($groupname, $members) = ($1, $2);
-	exists $groups{"\@$groupname"}
-	    and die "$HOOK: redefinition of group ($groupname) in '$source': $_\n";
-	foreach my $member (split / /, $members) {
-	    if ($member =~ /^\@/) {
-		# group member
-		$groups{"\@$groupname"}{$member} = $groups{$member}
-		    or die "HOOK: unknown group ($member) cited in '$source': $_\n";
-	    } else {
-		# user member
-		$groups{"\@$groupname"}{$member} = undef;
-	    }
-	}
-    }
-    return \%groups;
-}
-
-sub grok_groups {
-    my ($git) = @_;
-    state $groups = do {
-	my $option = $Config->{groups}
-	    or die "$HOOK: you have to define the check-acls.groups option to use groups.\n";
-
-	if (my ($groupfile) = ($option->[-1] =~ /^file:(.*)/)) {
-	    my @groupspecs = read_file($groupfile);
-	    defined $groupspecs[0]
-		or die "$HOOK: can't open groups file ($groupfile): $!\n";
-	    grok_groups_spec($git, \@groupspecs, $groupfile);
-	} else {
-	    my @groupspecs = split /\n/, $option->[-1];
-	    grok_groups_spec($git, \@groupspecs, "$HOOK.groups");
-	}
-    };
-    return $groups;
-}
-
-sub im_memberof {
-    my ($git, $groupname) = @_;
-
-    state $groups = grok_groups($git);
-
-    return 0 unless exists $groups->{$groupname};
-
-    my $group = $groups->{$groupname};
-    return 1 if exists $group->{$myself};
-    while (my ($member, $subgroup) = each %$group) {
-	next     unless defined $subgroup;
-	return 1 if     im_memberof($git, $member);
-    }
-    return 0;
-}
-
 sub match_user {
     my ($git, $spec) = @_;
     if ($spec =~ /^\^/) {
 	return 1 if $myself =~ $spec;
     } elsif ($spec =~ /^@/) {
-	return 1 if im_memberof($git, $spec);
+	return 1 if im_memberof($git, $myself, $spec);
     } else {
 	return 1 if $myself eq $spec;
     }
@@ -124,9 +66,6 @@ sub match_user {
 
 sub match_ref {
     my ($ref, $spec) = @_;
-
-    # Interpolate environment variables embedded as "{VAR}".
-    $spec =~ s/{(\w+)}/$ENV{$1}/ige;
 
     if ($spec =~ /^\^/) {
 	return 1 if $ref =~ $spec;
@@ -202,8 +141,17 @@ sub check_ref {
 sub check_affected_refs {
     my ($git) = @_;
 
-    $myself = $ENV{$Config->{userenv}[-1]}
-	or die "$HOOK: option userenv environment variable ($Config->{userenv}[-1]) is not defined.\n";
+    my $userenv = $Config->{userenv}[-1];
+
+    if ($userenv =~ /^eval:(.*)/) {
+	$myself = eval $1; ## no critic (BuiltinFunctions::ProhibitStringyEval)
+	die "$HOOK: error evaluating userenv value ($userenv): $@\n"
+	    if $@;
+    } elsif (exists $ENV{$userenv}) {
+	$myself = $ENV{$userenv};
+    } else {
+	die "$HOOK: option userenv environment variable ($Config->{userenv}[-1]) is not defined.\n";
+    }
 
     return if im_admin($git);
 
@@ -261,43 +209,28 @@ The plugin is configured by the following git options.
 When Git is performing its chores in the server to serve a push
 request it's usually invoked via the SSH or a web service, which take
 care of the authentication procedure. These services normally make the
-autenticated user name available in an environment variable. You may
+authenticated user name available in an environment variable. You may
 tell this hook which environment variable it is by setting this option
 to the variable's name. If not set, the hook will try to get the
 user's name from the C<USER> environment variable and die if it's not
 set.
 
-=head2 check-acls.groups GROUPSPEC
+If the user name is not directly available in an environment variable
+you may set this option to a code snippet by prefixing it with
+C<eval:>. The code will be evaluated and its value will be used as the
+user name. For example, RhodeCode's (L<http://rhodecode.org/>) up to
+version 1.3.6 used to pass the authenticated user name in the
+C<RHODECODE_USER> environment variable. From version 1.4.0 on it
+stopped using this variable and started to use another variable with
+more information in it. Like this:
 
-You can define user groups in order to make it easier to configure
-general acls. Use this option to tell where to find group
-definitions in one of these ways:
+    RHODECODE_EXTRAS='{"username": "rcadmin", "scm": "git", "repository": "git_intro/hooktest", "make_lock": null, "ip": "172.16.2.251", "locked_by": [null, null], "action": "push"}'
 
-=over
+To grok the user name from this variable, one may set this option like
+this:
 
-=item file:PATH/TO/FILE
-
-As a text file named by PATH/TO/FILE, which may be absolute or
-relative to the hooks current directory, which is usually the
-repository's root in the server. It's syntax is very simple. Blank
-lines are skipped. The hash (#) character starts a comment that goes
-to the end of the current line. Group definitions are lines like this:
-
-    groupA = userA userB @groupB userC
-
-Each group must be defined in a single line. Spaces are significant
-only between users and group references.
-
-Note that a group can reference other groups by name. To make a group
-reference, simple prefix its name with an at sign (@). Group
-references must reference groups previously defined in the file.
-
-=item GROUPS
-
-If the option's value doesn't start with any of the above prefixes, it
-must contain the group definitions itself.
-
-=back
+    git config check-acls.userenv \
+      'eval:(exists $ENV{RHODECODE_EXTRAS} && $ENV{RHODECODE_EXTRAS} =~ /"username":\s*"([^"]+)"/) ? $1 : undef'
 
 =head2 check-acls.admin USERSPEC
 
@@ -320,7 +253,9 @@ name case sensitively.
 =item @groupname
 
 A C<groupname> specifying a single group. The groupname specification
-must follow the same rules as the username above.
+must follow the same rules as the username above. (Groups are
+specified by the C<githooks.groups> configuration variable. See the
+C<Git::Hooks> documentation to know how to specify them.)
 
 =item ^regex
 
@@ -397,10 +332,10 @@ The complete name of a reference. For example, "refs/heads/master".
 
 =back
 
-The refs component can embed strings in the format C<{VAR}>. These
+The ACL specification can embed strings in the format C<{VAR}>. These
 strings are substituted by the corresponding environment's variable
-VAR value. This interpolation ocurrs before the refs component is
-matched agains the reference name.
+VAR value. This interpolation ocurrs before the components are split
+and processed.
 
 This is useful, for instance, if you want developers to be restricted
 in what they can do to oficial branches but to have complete control
