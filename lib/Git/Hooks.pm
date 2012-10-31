@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.016';
+  $Git::Hooks::VERSION = '0.017';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -146,11 +146,11 @@ sub spawn_external_file {
     }
     unless ($exit == 0) {
 	die __PACKAGE__, ": failed to execute '$file': $!\n"
-	    if $? == -1;
-	die sprintf(__PACKAGE__, ": '$file' died with signal %d, %s coredump\n",
-		    ($? & 127), ($? & 128) ? 'with' : 'without')
-	    if $? & 127;
-	die sprintf(__PACKAGE__, ": '$file' exited abnormally with value %d\n", $? >> 8);
+	    if $exit == -1;
+	die sprintf("%s: '$file' died with signal %d, %s coredump\n",
+		    __PACKAGE__, ($exit & 127), ($exit & 128) ? 'with' : 'without')
+	    if $exit & 127;
+	die sprintf("%s: '$file' exited abnormally with value %d\n", __PACKAGE__, $exit >> 8);
     }
 }
 
@@ -205,7 +205,8 @@ sub im_memberof {
 
     state $groups = grok_groups($git);
 
-    return 0 unless exists $groups->{$groupname};
+    exists $groups->{$groupname}
+	or die __PACKAGE__, ": group $groupname is not defined.\n";
 
     my $group = $groups->{$groupname};
     return 1 if exists $group->{$myself};
@@ -282,6 +283,7 @@ sub run_hook {
 
 1; # End of Git::Hooks
 
+__END__
 
 =pod
 
@@ -291,7 +293,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.016
+version 0.017
 
 =head1 SYNOPSIS
 
@@ -832,7 +834,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-
-
-__END__
-

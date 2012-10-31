@@ -3,7 +3,7 @@ use warnings;
 
 package Git::More;
 {
-  $Git::More::VERSION = '0.016';
+  $Git::More::VERSION = '0.017';
 }
 # ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
 use parent 'App::gh::Git';
@@ -96,6 +96,7 @@ sub get_affected_files {
 1;
 
 __END__
+
 =pod
 
 =head1 NAME
@@ -104,7 +105,7 @@ Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.016
+version 0.017
 
 =head1 SYNOPSIS
 
@@ -234,4 +235,3 @@ This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
 =cut
-

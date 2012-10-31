@@ -16,6 +16,7 @@ t/02-check-acls.t
 t/02-check-jira.t
 t/02-externals.t
 t/author-critic.t
+t/make-debug-environment.sh
 t/release-kwalitee.t
 t/release-pod-coverage.t
 t/release-pod-syntax.t
