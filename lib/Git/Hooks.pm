@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.017';
+  $Git::Hooks::VERSION = '0.018';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -231,7 +231,7 @@ sub run_hook {
     grok_affected_refs($hook_name);
 
     # Invoke enabled plugins
-    if (my $enabled_hooks = $config->{$hook_name}) {
+    if (my $enabled_plugins = $config->{$hook_name}) {
 	# Define the list of directories where we'll look for the hook
 	# plugins. First the local directory 'githooks' under the
 	# repository path, then the optional list of directories
@@ -242,7 +242,7 @@ sub run_hook {
 	my @plugin_dirs = grep {-d} @{$config->{plugins}};
 
       HOOK:
-	foreach my $hook (@$enabled_hooks) {
+	foreach my $hook (@$enabled_plugins) {
 	    $hook .= '.pl' if $hook !~ /\.pl$/;
 	    foreach my $dir (@plugin_dirs) {
 		my $script = catfile($dir, $hook);
@@ -258,11 +258,11 @@ sub run_hook {
 	    }
 	    die __PACKAGE__, ": can't find hook enabled hook $hook.\n";
 	}
+    }
 
-	# Call every hook function installed by the hook scripts before.
-	foreach my $hook (values %{$Hooks{$hook_name}}) {
-	    $hook->($Git, @args);
-	}
+    # Call every hook function installed by the hook scripts before.
+    foreach my $hook (values %{$Hooks{$hook_name}}) {
+	$hook->($Git, @args);
     }
 
     # Invoked enabled external hooks
@@ -293,7 +293,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.017
+version 0.018
 
 =head1 SYNOPSIS
 

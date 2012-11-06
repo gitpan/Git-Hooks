@@ -15,6 +15,7 @@ t/01-setup.t
 t/02-check-acls.t
 t/02-check-jira.t
 t/02-externals.t
+t/02-noplugin.t
 t/author-critic.t
 t/make-debug-environment.sh
 t/release-kwalitee.t
