@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.018';
+  $Git::Hooks::VERSION = '0.019';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -65,9 +65,9 @@ sub is_ref_enabled {
     return 0;
 }
 
-# This is an internal routine used to grok the affected refs of update
-# and pre-receive hooks. They're kept in a common data structure so
-# that those hooks can usually share code.
+# This is an internal routine used to grok the affected refs of
+# update, pre-receive, and post-receive hooks. They're kept in a
+# common data structure so that those hooks can usually share code.
 
 my %affected_refs;
 sub grok_affected_refs {
@@ -75,8 +75,9 @@ sub grok_affected_refs {
     if ($hook_name eq 'update') {
 	my ($ref, $old_commit, $new_commit) = @ARGV;
 	$affected_refs{$ref}{range} = [$old_commit, $new_commit];
-    } elsif ($hook_name eq 'pre-receive') {
-	# pre-receive gets the list of affected commits via STDIN.
+    } elsif ($hook_name =~ /^(?:pre|post)-receive$/) {
+	# pre-receive and post-receive get the list of affected
+	# commits via STDIN.
 	while (<>) {
 	    chomp;
 	    my ($old_commit, $new_commit, $ref) = split;
@@ -125,7 +126,7 @@ sub spawn_external_file {
     my ($file, $hook, @args) = @_;
 
     my $exit;
-    if ($hook ne 'pre-receive') {
+    if ($hook !~ /^(?:pre|post)-receive$/) {
 	$exit = system {$file} ($hook, @args);
     } else {
 	my $pid = open my $pipe, '|-';
@@ -226,8 +227,8 @@ sub run_hook {
 
     my $config = hook_config('githooks');
 
-    # Some hooks (pre-receive and update) affect refs and associated
-    # commit ranges. Let's grok them at once.
+    # Some hooks (update, pre-receive, and post-receive) affect refs
+    # and associated commit ranges. Let's grok them at once.
     grok_affected_refs($hook_name);
 
     # Invoke enabled plugins
@@ -293,7 +294,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.018
+version 0.019
 
 =head1 SYNOPSIS
 
@@ -780,9 +781,9 @@ ref-specs in SPECS. REF is the complete name of a Git ref and SPECS is
 a reference to an array of strings, each one specifying a rule for
 matching ref names.
 
-You may want to use it, for example, in an C<update> or in a
-C<pre-receive> hook which may be enabled depending on the particular
-refs being affected.
+You may want to use it, for example, in an C<update>, C<pre-receive>,
+or C<post-receive> hook which may be enabled depending on the
+particular refs being affected.
 
 Each rule in SPECS may indicate the matching refs as the complete ref
 name (e.g. "refs/heads/master") or by a regular expression starting
@@ -792,9 +793,9 @@ with a caret (C<^>), which is kept as part of the regexp.
 
 This routine returns a list of all the Git refs affected by the
 current operation. During the C<update> hook it returns the single ref
-passed via the command line. During the C<pre-receive> hook it returns
-the list of refs passed via STDIN. During any other hook it returns
-the empty list.
+passed via the command line. During the C<pre-receive> and
+C<post-receive> hooks it returns the list of refs passed via
+STDIN. During any other hook it returns the empty list.
 
 =head2 get_affected_ref_range(REF)
 
