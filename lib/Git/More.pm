@@ -3,7 +3,7 @@ use warnings;
 
 package Git::More;
 {
-  $Git::More::VERSION = '0.019';
+  $Git::More::VERSION = '0.020';
 }
 # ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
 use parent 'App::gh::Git';
@@ -105,7 +105,7 @@ Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.019
+version 0.020
 
 =head1 SYNOPSIS
 

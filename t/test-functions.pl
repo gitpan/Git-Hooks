@@ -112,7 +112,9 @@ sub new_repos {
 	}
 
 	my $repo = Git::More->repository(Directory => $repodir);
-	$repo->command(add => $filename);
+	$repo->command(config => 'user.mail', 'myself@example.com');
+	$repo->command(config => 'user.name', 'My Self');
+	$repo->command(add    => $filename);
 	$repo->command(commit => '-mx');
 
 	($ok, $exit, $stdout) = test_command(undef, 'clone', '-q', '--bare', '--no-hardlinks', $repodir, $clonedir);
@@ -125,7 +127,7 @@ sub new_repos {
     } otherwise {
 	my $E = shift;
 	my $ls = `find $T -ls`;	# FIXME: this is non-portable.
-	diag("Error setting up repos for test: $E\nRepos parent directory listing:\n$ls\ngit-version=$git_version\n");
+	diag("Error setting up repos for test: $E\nRepos parent directory listing:\n$ls\ngit-version=$git_version\n\@INC=@INC\n");
 	BAIL_OUT('Cannot setup repos for testing');
     };
 }
