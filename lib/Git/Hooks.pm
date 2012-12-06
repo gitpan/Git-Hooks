@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.020';
+  $Git::Hooks::VERSION = '0.021';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -39,7 +39,7 @@ BEGIN {
     }
 
     @EXPORT      = (@installers, 'run_hook');
-    @EXPORT_OK   = qw/hook_config is_ref_enabled im_memberof eval_gitconfig/;
+    @EXPORT_OK   = qw/hook_config is_ref_enabled im_memberof grok_userenv match_user im_admin eval_gitconfig/;
     %EXPORT_TAGS = (utils => \@EXPORT_OK);
 }
 
@@ -156,7 +156,7 @@ sub spawn_external_file {
 }
 
 sub grok_groups_spec {
-    my ($git, $specs, $source) = @_;
+    my ($specs, $source) = @_;
     my %groups;
     foreach (@$specs) {
 	s/\#.*//;		# strip comments
@@ -181,7 +181,6 @@ sub grok_groups_spec {
 }
 
 sub grok_groups {
-    my ($git) = @_;
     state $groups = do {
 	my $config = config();
 	exists $config->{githooks}{groups}
@@ -192,19 +191,19 @@ sub grok_groups {
 	    my @groupspecs = read_file($groupfile);
 	    defined $groupspecs[0]
 		or die __PACKAGE__, ": can't open groups file ($groupfile): $!\n";
-	    grok_groups_spec($git, \@groupspecs, $groupfile);
+	    grok_groups_spec(\@groupspecs, $groupfile);
 	} else {
 	    my @groupspecs = split /\n/, $option->[-1];
-	    grok_groups_spec($git, \@groupspecs, "githooks.groups");
+	    grok_groups_spec(\@groupspecs, "githooks.groups");
 	}
     };
     return $groups;
 }
 
 sub im_memberof {
-    my ($git, $myself, $groupname) = @_;
+    my ($myself, $groupname) = @_;
 
-    state $groups = grok_groups($git);
+    state $groups = grok_groups();
 
     exists $groups->{$groupname}
 	or die __PACKAGE__, ": group $groupname is not defined.\n";
@@ -213,7 +212,54 @@ sub im_memberof {
     return 1 if exists $group->{$myself};
     while (my ($member, $subgroup) = each %$group) {
 	next     unless defined $subgroup;
-	return 1 if     im_memberof($git, $myself, $member);
+	return 1 if     im_memberof($myself, $member);
+    }
+    return 0;
+}
+
+my $myself;
+sub grok_userenv {
+    my $userenv = config()->{githooks}{userenv}
+	or return;
+
+    $userenv = $userenv->[-1] if is_array_ref($userenv);
+
+    if ($userenv =~ /^eval:(.*)/) {
+	$myself = eval $1; ## no critic (BuiltinFunctions::ProhibitStringyEval)
+	die __PACKAGE__, ": error evaluating userenv value ($userenv): $@\n"
+	    if $@;
+    } elsif (exists $ENV{$userenv}) {
+	$myself = $ENV{$userenv};
+    } else {
+	die __PACKAGE__, ": option userenv environment variable ($userenv) is not defined.\n";
+    }
+
+    return $myself;
+}
+
+sub match_user {
+    my ($spec) = @_;
+
+    grok_userenv() unless defined $myself;
+    return 0       unless defined $myself;
+
+    if ($spec =~ /^\^/) {
+	return 1 if $myself =~ $spec;
+    } elsif ($spec =~ /^@/) {
+	return 1 if im_memberof($myself, $spec);
+    } else {
+	return 1 if $myself eq $spec;
+    }
+    return 0;
+}
+
+sub im_admin {
+    my $config = hook_config('githooks');
+    return 0 unless defined $config and exists $config->{admin};
+    foreach my $admin (@{$config->{admin}}) {
+	if (match_user($admin)) {
+	    return 1;
+	}
     }
     return 0;
 }
@@ -316,7 +362,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.020
+version 0.021
 
 =head1 SYNOPSIS
 
@@ -425,9 +471,19 @@ don't worry. Git::Hooks can drive external hooks very easily.
 
 =head1 USAGE
 
-Go to the C<.git/hooks> directory under the root of your Git
-repository. You should see there a bunch of hook samples. Create a
-script there using the Git::Hooks module.
+There are a few simple steps you should do in order to set up
+Git::Hooks so that you can configure it to use some predefined plugins
+or start coding your own hooks.
+
+The first step is to create a generic script that will be invoked by
+Git for every hook. If you are implementing hooks in your local
+repository, go to its C<.git/hooks> sub-directory. If you are
+implementing the hooks in a bare repository in your server, go to its
+C<hooks> subdirectory.
+
+You should see there a bunch of files with names ending in C<.sample>
+which are hook examples. Create a three-line script called, e.g.,
+C<git-hooks.pl>, in this directory like this:
 
 	$ cd /path/to/repo/.git/hooks
 
@@ -439,16 +495,19 @@ script there using the Git::Hooks module.
 
 	$ chmod +x git-hooks.pl
 
-This script will serve for any hook. Create symbolic links pointing to
-it for each hook you are interested in. (You may create symbolic links
-for all 16 hooks, but this will make Git call the script for all
-hooked operations, even for those that you may not be interested
-in. Nothing wrong will happen, but the server will be doing extra work
-for nothing.)
+Now you should create symbolic links pointing to it for each hook you
+are interested in. For example, if you are interested in a
+C<commit-msg> hook, create a symbolic link called C<commit-msg>
+pointing to the C<git-hooks.pl> file. This way, Git will invoke the
+generic script for all hooks you are interested in. (You may create
+symbolic links for all 16 hooks, but this will make Git call the
+script for all hooked operations, even for those that you may not be
+interested in. Nothing wrong will happen, but the server will be doing
+extra work for nothing.)
 
-	$ ln -s git-hooks.pl pre-receive
 	$ ln -s git-hooks.pl commit-msg
 	$ ln -s git-hooks.pl post-commit
+	$ ln -s git-hooks.pl pre-receive
 
 As is, the script won't do anything. You have to implement some hooks
 in it, use some of the existing plugins, or set up some external
@@ -458,8 +517,11 @@ a call to C<run_hook> passing to it the name with which it was called
 
 =head2 Implementing Hooks
 
-Implement hooks using one of the hook I<directives> described in the
-HOOK DIRECTIVES section. For example:
+You may implement your own hooks using one of the hook I<directives>
+described in the HOOK DIRECTIVES section below. Your hooks may be
+implemented in the generic script you have created. They must be
+defined after the C<use Git::Hooks> line and before the C<run_hooks()>
+line. For example:
 
     # Check if every added/updated file is smaller than a fixed limit.
 
@@ -505,6 +567,15 @@ HOOK DIRECTIVES section. For example:
         }
     };
 
+Note that you may define several hooks for the same operation. In the
+above example, we've defined two PRE_COMMIT hooks. Both are going to
+be executed when Git invokes the generic script during the pre-commit
+phase.
+
+You may implement different kinds of hooks in the same generic
+script. The function C<run_hooks()> will activate just the ones for
+the current Git phase.
+
 =head2 Using Plugins
 
 There are several hooks already implemented as plugin modules under
@@ -521,7 +592,7 @@ push to the repository and affect which Git refs.
 
 =item Git::Hooks::check-jira.pl
 
-Integrate Git with the JIRA L<http://www.atlassian.com/software/jira/>
+Integrate Git with the JIRA L<http://www.atlassian.com/software/jira/>phase
 ticketing system by requiring that every commit message cites valid
 JIRA issues.
 
@@ -530,15 +601,22 @@ JIRA issues.
 Each plugin may be used in one or, sometimes, multiple hooks. Their
 documentation is explicit about this.
 
+These plugins are configured by Git's own configurarion framework,
+using the C<git config> command or by directly editing Git's
+configuration files. (See C<git help config> to know more about Git's
+configuration infrastructure.)
+
+The CONFIGURATION section below explains this in more detail.
+
 =head2 Invoking external hooks
 
-Since the default Git hook scripts are taken by the Git::Hooks driver
-script, you must install your external hooks somewhere else. By
-default, the C<run_hook> routine will look for external hook scripts
-in the directory C<.git/hooks.d> (which you must create) under the
-repository. Below this directory you should have another level of
-directories, named after the default hook names, under which you can
-drop your external hooks.
+Since the default Git hook scripts are taken by the symbolic links to
+the Git::Hooks generic script, you must install your external hooks
+somewhere else. By default, the C<run_hook> routine will look for
+external hook scripts in the directory C<.git/hooks.d> (which you must
+create) under the repository. Below this directory you should have
+another level of directories, named after the default hook names,
+under which you can drop your external hooks.
 
 For example, let's say you want to use some of the hooks in the
 standard Git package
@@ -566,9 +644,9 @@ exit with an appropriate error message.
 =head1 CONFIGURATION
 
 Git::Hooks is configured via Git's own configuration
-infrastructure. The framework defines a few options which are
-described below. Each plugin may define other specific options which
-are described in their own documentation.
+infrastructure. There are a few global options which are described
+below. Each plugin may define other specific options which are
+described in their own documentation.
 
 You should get comfortable with C<git config> command (read C<git help
 config>) to know how to configure Git::Hooks.
@@ -693,6 +771,69 @@ references must reference groups previously defined in the file.
 
 If the option's value doesn't start with any of the above prefixes, it
 must contain the group definitions itself.
+
+=back
+
+=head2 githooks.userenv STRING
+
+When Git is performing its chores in the server to serve a push
+request it's usually invoked via the SSH or a web service, which take
+care of the authentication procedure. These services normally make the
+authenticated user name available in an environment variable. You may
+tell this hook which environment variable it is by setting this option
+to the variable's name. If not set, the hook will try to get the
+user's name from the C<USER> environment variable and let it undefined
+if it can't figure it out.
+
+If the user name is not directly available in an environment variable
+you may set this option to a code snippet by prefixing it with
+C<eval:>. The code will be evaluated and its value will be used as the
+user name. For example, RhodeCode's (L<http://rhodecode.org/>) up to
+version 1.3.6 used to pass the authenticated user name in the
+C<RHODECODE_USER> environment variable. From version 1.4.0 on it
+stopped using this variable and started to use another variable with
+more information in it. Like this:
+
+    RHODECODE_EXTRAS='{"username": "rcadmin", "scm": "git", "repository": "git_intro/hooktest", "make_lock": null, "ip": "172.16.2.251", "locked_by": [null, null], "action": "push"}'
+
+To grok the user name from this variable, one may set this option like
+this:
+
+    git config check-acls.userenv \
+      'eval:(exists $ENV{RHODECODE_EXTRAS} && $ENV{RHODECODE_EXTRAS} =~ /"username":\s*"([^"]+)"/) ? $1 : undef'
+
+This variable is useful for any hook that need to authenticate the
+user performing the git action.
+
+=head2 githooks.admin USERSPEC
+
+There are several hooks that perform access control checks before
+allowing a git action, such as the ones installed by the C<check-acls>
+and the C<check-jira> plugins. It's useful to allow some people (the
+"administrators") to bypass those checks. These hooks usually allow
+the users specified by this variable to do whatever they want to the
+repository. You may want to set it to a group of "super users" in your
+team so that they can "fix" things more easily.
+
+The value of each option is interpreted in one of these ways:
+
+=over
+
+=item username
+
+A C<username> specifying a single user. The username specification
+must match "/^\w+$/i" and will be compared to the authenticated user's
+name case sensitively.
+
+=item @groupname
+
+A C<groupname> specifying a single group.
+
+=item ^regex
+
+A C<regex> which will be matched against the authenticated user's name
+case-insensitively. The caret is part of the regex, meaning that it's
+anchored at the start of the username.
 
 =back
 
@@ -835,11 +976,31 @@ This routine returns the list of commits leading from the affected
 REF's NEWCOMMIT to OLDCOMMIT. The commits are represented by hashes,
 as returned by C<Git::More::get_commits>.
 
-=head2 im_memberof(GIT, USER, GROUPNAME)
+=head2 im_memberof(USER, GROUPNAME)
 
 This routine tells if USER belongs to GROUPNAME. The groupname is
 looked for in the specification given by the C<githooks.groups>
 configuration variable.
+
+=head2 grok_userenv()
+
+This routine returns the username of the authenticated user performing
+the Git action. It groks it from the C<githooks.userenv> configuration
+variable specification, which is described above.
+
+=head2 match_user(SPEC)
+
+This routine checks if the authenticated user (as returned by the
+C<grok_userenv> routine above) matches the specification, which may be
+given in one of the three different forms acceptable for the
+C<githooks.admin> configuration variable above, i.e., as a username,
+as a @group, or as a ^regex.
+
+=head2 im_admin()
+
+This routine checks if the authenticated user (again, as returned by
+the C<grok_userenv> routine above) matches the specifications given by
+the C<githooks.admin> configuration variable.
 
 =head2 eval_gitconfig(VALUE)
 
