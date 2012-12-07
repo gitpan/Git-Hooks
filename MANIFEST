@@ -9,11 +9,13 @@ dist.ini
 lib/Git/Hooks.pm
 lib/Git/Hooks/check-acls.pl
 lib/Git/Hooks/check-jira.pl
+lib/Git/Hooks/check-structure.pl
 lib/Git/More.pm
 t/00-load.t
 t/01-setup.t
 t/02-check-acls.t
 t/02-check-jira.t
+t/02-check-structure.t
 t/02-externals.t
 t/02-noplugin.t
 t/author-critic.t

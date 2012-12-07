@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.021';
+  $Git::Hooks::VERSION = '0.022';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -362,7 +362,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.021
+version 0.022
 
 =head1 SYNOPSIS
 
@@ -435,7 +435,7 @@ hook you normally end up facing two problems.
 
 =item B<Complexity>
 
-In order to integrate the funcionality of more than one script you
+In order to integrate the functionality of more than one script you
 have to write a driver script that's called by Git and calls all the
 other scripts in order, passing to them the arguments they
 need. Moreover, some of those scripts may have configuration files to
@@ -444,7 +444,7 @@ read and you may have to maintain several of them.
 =item B<Inefficiency>
 
 This arrangement is inefficient in two ways. First because each script
-runs as a separate process, which usually have a high startup cost
+runs as a separate process, which usually have a high start up cost
 because they are, well, scripts and not binaries. (For a dissent view
 on this, see
 L<http://gnustavo.wordpress.com/2012/06/28/programming-languages-start-up-times/>.)
@@ -460,7 +460,7 @@ external hooks in a way that tries to solve these problems.
 
 Instead of having separate scripts implementing different
 functionality you may have a single script implementing all the
-funcionality you need either directly or using some of the existing
+functionality you need either directly or using some of the existing
 plugins, which are implemented by Perl scripts in the Git::Hooks::
 namespace. This single script can be used to implement all standard
 hooks, because each hook knows when to perform based on the context in
@@ -479,7 +479,7 @@ The first step is to create a generic script that will be invoked by
 Git for every hook. If you are implementing hooks in your local
 repository, go to its C<.git/hooks> sub-directory. If you are
 implementing the hooks in a bare repository in your server, go to its
-C<hooks> subdirectory.
+C<hooks> sub-directory.
 
 You should see there a bunch of files with names ending in C<.sample>
 which are hook examples. Create a three-line script called, e.g.,
@@ -596,12 +596,18 @@ Integrate Git with the JIRA L<http://www.atlassian.com/software/jira/>phase
 ticketing system by requiring that every commit message cites valid
 JIRA issues.
 
+=item Git::Hooks::check-structure.pl
+
+Check if newly added files and references (branches and tags) comply
+with specified policies, so that you can impose a strict structure to
+the repository's file and reference hierarchies.
+
 =back
 
 Each plugin may be used in one or, sometimes, multiple hooks. Their
 documentation is explicit about this.
 
-These plugins are configured by Git's own configurarion framework,
+These plugins are configured by Git's own configuration framework,
 using the C<git config> command or by directly editing Git's
 configuration files. (See C<git help config> to know more about Git's
 configuration infrastructure.)
@@ -729,7 +735,7 @@ your changes back to us, though.)
 
 By default the driver script will look for external hooks after
 executing every enabled plugins. You may disable external hooks
-invokation by setting this option to 0.
+invocation by setting this option to 0.
 
 =head2 githooks.hooks DIR
 
@@ -918,7 +924,7 @@ Git::Hooks:
 
 Usually at the end, the plugin should use one or more of the hook
 directives defined above to install its hook routines in the
-apropriate hooks.
+appropriate hooks.
 
 Every hook routine receives a Git::More object as its first
 argument. You should use it to infer all needed information from the
