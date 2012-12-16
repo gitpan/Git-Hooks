@@ -3,14 +3,13 @@ use warnings;
 
 package Git::More;
 {
-  $Git::More::VERSION = '0.022';
+  $Git::More::VERSION = '0.023';
 }
 # ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
 use parent 'App::gh::Git';
 
 use Error qw(:try);
 use Carp;
-
 
 sub get_config {
     my ($git) = @_;
@@ -38,7 +37,6 @@ sub get_config {
     return $git->{more}{config};
 }
 
-
 sub get_current_branch {
     my ($git) = @_;
     foreach ($git->command(branch => '--no-color')) {
@@ -46,7 +44,6 @@ sub get_current_branch {
     }
     return;
 }
-
 
 sub get_commits {
     my ($git, $old_commit, $new_commit) = @_;
@@ -71,14 +68,13 @@ sub get_commits {
     return \@commits;
 }
 
-
 sub get_commit_msg {
     my ($git, $commit) = @_;
     my $body = $git->command('rev-list' => '--format=%B', '--max-count=1', $commit);
-    $body =~ s/^.*//m;    # strip first line, which contains the commit id
+    $body =~ s/^[^\n]*\n//; # strip first line, which contains the commit id
+    chomp $body;	    # strip last newline
     return $body;
 }
-
 
 sub get_diff_files {
     my ($git, @args) = @_;
@@ -90,8 +86,8 @@ sub get_diff_files {
     return \%affected;
 }
 
-
-1;
+
+1; # End of Git::More
 
 __END__
 
@@ -103,7 +99,7 @@ Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.022
+version 0.023
 
 =head1 SYNOPSIS
 
@@ -113,8 +109,11 @@ version 0.022
 
     my $config  = $git->get_config('section');
     my $branch  = $git->get_current_branch();
-    my $commits = $git->get_refs_commits();
+    my $commits = $git->get_commits($oldcommit, $newcommit);
     my $message = $git->get_commit_msg('HEAD');
+
+    my $files_modified_by_commit = $git->get_diff_files('--diff-filter=AM', '--cached');
+    my $files_modified_by_push   = $git->get_diff_files('--diff-filter=AM', $oldcommit, $newcommit);
 
 =head1 DESCRIPTION
 
@@ -179,6 +178,11 @@ This method returns the repository's current branch name, as indicated
 by the C<git branch> command. Note that its a ref short name, i.e.,
 it's usually sub-intended to reside under the 'refs/heads/' ref scope.
 
+=head2 get_commit_msg COMMIT_ID
+
+This method returns the commit message (aka body) of the commit
+identified by COMMIT_ID. The result is a string.
+
 =head2 get_commits OLDCOMMIT NEWCOMMIT
 
 This method returns a list of hashes representing every commit
@@ -200,11 +204,6 @@ codes are explained in the C<git help rev-list> document):
         committer_date  => %ci: committer date in ISO8601 format
         body            => %B:  raw body (aka commit message)
     }
-
-=head2 get_commit_msg COMMIT_ID
-
-This method returns the commit message (aka body) of the commit
-identified by COMMIT_ID. The result is a string.
 
 =head2 get_diff_files DIFFARGS...
 

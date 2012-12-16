@@ -7,9 +7,9 @@ README
 TODO
 dist.ini
 lib/Git/Hooks.pm
-lib/Git/Hooks/check-acls.pl
-lib/Git/Hooks/check-jira.pl
-lib/Git/Hooks/check-structure.pl
+lib/Git/Hooks/CheckAcls.pm
+lib/Git/Hooks/CheckJira.pm
+lib/Git/Hooks/CheckStructure.pm
 lib/Git/More.pm
 t/00-load.t
 t/01-setup.t

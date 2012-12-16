@@ -4,7 +4,7 @@ use warnings;
 
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.022';
+  $Git::Hooks::VERSION = '0.023';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -14,7 +14,6 @@ use File::Basename;
 use File::Spec::Functions;
 use Git::More;
 
-our $Git;
 our %Hooks;
 our (@EXPORT, @EXPORT_OK, %EXPORT_TAGS);
 
@@ -39,18 +38,29 @@ BEGIN {
     }
 
     @EXPORT      = (@installers, 'run_hook');
-    @EXPORT_OK   = qw/hook_config is_ref_enabled im_memberof grok_userenv match_user im_admin eval_gitconfig/;
+
+    @EXPORT_OK = qw/repository hook_config is_ref_enabled
+		    get_affected_refs get_affected_ref_commits
+		    get_affected_ref_range im_memberof grok_userenv
+		    match_user im_admin eval_gitconfig
+		    flatten_plugin_name unflatten_plugin_name/;
+
     %EXPORT_TAGS = (utils => \@EXPORT_OK);
 }
 
+sub repository {
+    state $git = Git::More->repository();
+    return $git;
+}
+
 sub config {
-    state $config = $Git->get_config();
+    state $config = repository()->get_config();
     return $config;
 }
 
 sub hook_config {
     my ($plugin) = @_;
-    return config()->{$plugin};
+    return config()->{$plugin} || config()->{flatten_plugin_name($plugin)};
 }
 
 sub is_ref_enabled {
@@ -103,7 +113,7 @@ sub get_affected_ref_commit_ids {
 
     unless (exists $affected_refs{$ref}{ids}) {
 	my $range = get_affected_ref_range($ref);
-	$affected_refs{$ref}{ids} = [$Git->command('rev-list' => join('..', @$range))];
+	$affected_refs{$ref}{ids} = [repository()->command('rev-list' => join('..', @$range))];
     }
 
     return $affected_refs{$ref}{ids};
@@ -113,7 +123,7 @@ sub get_affected_ref_commits {
     my ($ref) = @_;
 
     unless (exists $affected_refs{$ref}{commits}) {
-	$affected_refs{$ref}{commits} = $Git->get_commits(get_affected_ref_range($ref));
+	$affected_refs{$ref}{commits} = repository()->get_commits(get_affected_ref_range($ref));
     }
 
     return $affected_refs{$ref}{commits};
@@ -286,12 +296,28 @@ sub eval_gitconfig {
     return $value;
 }
 
+sub flatten_plugin_name {
+    my ($name) = @_;
+
+    $name =~ s/.*:://;
+    $name =~ s/([a-z])([A-Z])/$1-$2/g;
+    return lc $name;
+}
+
+sub unflatten_plugin_name {
+    my ($name) = @_;
+
+    $name =~ s/-([a-z])/\U$1\E/g;
+    $name =~ s/\.p[lm]$//i;
+    return ucfirst "$name.pm";
+}
+
 sub run_hook {
     my ($hook_name, @args) = @_;
 
     $hook_name = basename $hook_name;
 
-    $Git = Git::More->repository();
+    my $git = repository();
 
     my $config = hook_config('githooks');
 
@@ -312,9 +338,9 @@ sub run_hook {
 
       HOOK:
 	foreach my $hook (@$enabled_plugins) {
-	    $hook .= '.pl' if $hook !~ /\.pl$/;
+	    my $name = unflatten_plugin_name($hook);
 	    foreach my $dir (@plugin_dirs) {
-		my $script = catfile($dir, $hook);
+		my $script = catfile($dir, $name);
 		next unless -f $script;
 
 		my $exit = do $script;
@@ -325,20 +351,20 @@ sub run_hook {
 		}
 		next HOOK;
 	    }
-	    die __PACKAGE__, ": can't find hook enabled hook $hook.\n";
+	    die __PACKAGE__, ": can't find enabled hook $hook (a.k.a. $name).\n";
 	}
     }
 
     # Call every hook function installed by the hook scripts before.
     foreach my $hook (values %{$Hooks{$hook_name}}) {
-	$hook->($Git, @args);
+	$hook->($git, @args);
     }
 
     # Invoked enabled external hooks
     unless (exists $config->{externals} && ! $config->{externals}[-1]) {
 	# By default, start looking for external hooks in the
 	# '.git/hooks.d' directory.
-	unshift @{$config->{hooks}}, catfile($Git->repo_path(), 'hooks.d');
+	unshift @{$config->{hooks}}, catfile($git->repo_path(), 'hooks.d');
 
 	foreach my $dir (grep {-e} map {catfile($_, $hook_name)} @{$config->{hooks}}) {
 	    opendir my $dh, $dir or die __PACKAGE__, ": cannot opendir $dir: $!\n";
@@ -362,7 +388,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.022
+version 0.023
 
 =head1 SYNOPSIS
 
@@ -394,7 +420,7 @@ options. (More on this later.)
 
 	run_hook($0, @ARGV);
 
-=for Pod::Coverage config grok_affected_refs spawn_external_file grok_groups_spec grok_groups
+=for Pod::Coverage repository config grok_affected_refs spawn_external_file grok_groups_spec grok_groups
 
 =head1 INTRODUCTION
 
@@ -585,18 +611,18 @@ more details.
 
 =over
 
-=item Git::Hooks::check-acls.pl
+=item Git::Hooks::CheckAcls
 
 Allow you to specify Access Control Lists to tell who can commit or
 push to the repository and affect which Git refs.
 
-=item Git::Hooks::check-jira.pl
+=item Git::Hooks::CheckJira
 
 Integrate Git with the JIRA L<http://www.atlassian.com/software/jira/>phase
 ticketing system by requiring that every commit message cites valid
 JIRA issues.
 
-=item Git::Hooks::check-structure.pl
+=item Git::Hooks::CheckStructure
 
 Check if newly added files and references (branches and tags) comply
 with specified policies, so that you can impose a strict structure to
@@ -696,22 +722,25 @@ define configuration global to a user or local to a repository.
 =head2 githooks.post-rewrite       PLUGIN
 
 To enable a plugin you must register it with one of the above
-options. For instance, if you want to enable the C<check-jira.pl>
+options. For instance, if you want to enable the C<CheckJira>
 plugin in the C<update> hook, you must do this:
 
-    $ git config --add githooks.update check-jira
+    $ git config --add githooks.update CheckJira
 
-(The '.pl' extension in the plugin name is optional.)
+(Up to version 0.022 of Git::Hooks, the plugin filename were in the
+form C<check-jira.pl>. The old form is still valid to preserve
+compatibility, but the standard CamelCase form for Perl module names
+are now prefered. The '.pl' extension in the plugin name is optional.)
 
 Note that you may enable more than one plugin to the same hook. For
 instance:
 
-    $ git config --add githooks.update check-acls
+    $ git config --add githooks.update CheckAcls
 
 And you may enable the same plugin in more than one hook, if it makes
 sense to do so. For instance:
 
-    $ git config --add githooks.commit-msg check-jira
+    $ git config --add githooks.commit-msg CheckJira
 
 =head2 githooks.plugins DIR
 
@@ -814,8 +843,8 @@ user performing the git action.
 =head2 githooks.admin USERSPEC
 
 There are several hooks that perform access control checks before
-allowing a git action, such as the ones installed by the C<check-acls>
-and the C<check-jira> plugins. It's useful to allow some people (the
+allowing a git action, such as the ones installed by the C<CheckAcls>
+and the C<CheckJira> plugins. It's useful to allow some people (the
 "administrators") to bypass those checks. These hooks usually allow
 the users specified by this variable to do whatever they want to the
 repository. You may want to set it to a group of "super users" in your
@@ -1017,6 +1046,19 @@ C<VALUE> is a string beginning with C<file:>, the remaining of it is
 treated as a file name which contents are evaluated as Perl code and
 the resulting value is returned. Otherwise, C<VALUE> itself is
 returned.
+
+=head2 flatten_plugin_name(PACKAGENAME)
+
+This routine takes a name like C<Git::Hooks::CheckJira> and returns
+C<check-jira>. It takes the PACKAGENAME's basename, inserts hyphens
+between the CamelCased words and lowercase everything.
+
+=head2 unflatten_plugin_name(PLUGINNAME)
+
+This routine takes a name like C<check-jira.pl> and returns
+C<Git::Hooks::CheckJira>. It takes the PLUGINNAME, upcase the
+characteres following hyphens, removes the hyphens, and upcase the
+first line. It also strips a trailing C<.pl>, if present.
 
 =head1 SEE ALSO
 

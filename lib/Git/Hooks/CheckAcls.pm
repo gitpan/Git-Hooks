@@ -19,11 +19,18 @@ use 5.010;
 use utf8;
 use strict;
 use warnings;
-use Git::Hooks qw/:utils/;
+
+package Git::Hooks::CheckAcls;
+{
+  $Git::Hooks::CheckAcls::VERSION = '0.023';
+}
+# ABSTRACT: Git::Hooks plugin for branch/tag access control.
+
 use File::Slurp;
 use Error qw(:try);
+use Git::Hooks qw/:DEFAULT :utils/;
 
-my $HOOK = "check-acls";
+(my $HOOK = __PACKAGE__) =~ s/.*:://;
 
 #############
 # Grok hook configuration and set defaults.
@@ -31,12 +38,12 @@ my $HOOK = "check-acls";
 my $Config = hook_config($HOOK);
 
 # Up to version 0.020 the configuration variables 'admin' and
-# 'userenv' were defined for the check-acls plugin. In version 0.021
+# 'userenv' were defined for the CheckAcls plugin. In version 0.021
 # they were both "promoted" to the Git::Hooks module, so that they can
 # be used by any access control plugin. In order to maintain
 # compatibility with their previous usage, here we virtually "inject"
 # the variables in the "githooks" configuration section if they
-# undefined there and are defined in the "check-acls" section.
+# undefined there and are defined in the "CheckAcls" section.
 foreach my $var (qw/admin userenv/) {
     if (exists $Config->{$var} && ! exists hook_config('githooks')->{$var}) {
 	hook_config('githooks')->{$var} = $Config->{$var};
@@ -137,11 +144,17 @@ PRE_RECEIVE \&check_affected_refs;
 
 1;
 
-
 __END__
+
+=pod
+
 =head1 NAME
 
-check-acls.pl - Git::Hooks plugin for branch/tag access control.
+Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
+
+=head1 VERSION
+
+version 0.023
 
 =head1 DESCRIPTION
 
@@ -168,26 +181,32 @@ branch.
 To enable it you should define the appropriate Git configuration
 option:
 
-    git config --add githooks.update      check-acls.pl
-    git config --add githooks.pre-receive check-acls.pl
+    git config --add githooks.update      CheckAcls
+    git config --add githooks.pre-receive CheckAcls
+
+=for Pod::Coverage check_ref grok_acls match_ref
+
+=head1 NAME
+
+Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
 
 =head1 CONFIGURATION
 
 The plugin is configured by the following git options.
 
-=head2 check-acls.userenv STRING
+=head2 CheckAcls.userenv STRING
 
 This variable is deprecated. Please, use the C<githooks.userenv>
 variable, which is defined in the Git::Hooks module. Please, see its
 documentation to understand it.
 
-=head2 check-acls.admin USERSPEC
+=head2 CheckAcls.admin USERSPEC
 
 This variable is deprecated. Please, use the C<githooks.admin>
 variable, which is defined in the Git::Hooks module. Please, see its
 documentation to understand it.
 
-=head2 check-acls.acl ACL
+=head2 CheckAcls.acl ACL
 
 The authorization specification for a repository is defined by the set
 of ACLs defined by this option. Each ACL specify 'who' has 'what' kind
@@ -205,7 +224,7 @@ username and reference name, then the operation is denied.
 
 The 'who' component specifies to which users this ACL gives access. It
 can be specified in the same three ways as was explained to the
-check-acls.admin option above.
+CheckAcls.admin option above.
 
 The 'what' component specifies what kind of access to allow. It's
 specified as a string of one or more of the following opcodes:
@@ -263,16 +282,39 @@ This is useful, for instance, if you want developers to be restricted
 in what they can do to official branches but to have complete control
 with their own branch namespace.
 
-    git config check-acls.acl '^. CRUD ^refs/heads/{USER}/'
-    git config check-acls.acl '^. U    ^refs/heads'
+    git config CheckAcls.acl '^. CRUD ^refs/heads/{USER}/'
+    git config CheckAcls.acl '^. U    ^refs/heads'
 
 In this example, every user (^.) has complete control (CRUD) to the
 branches below "refs/heads/{USER}". Supposing the environment variable
 USER contains the user's login name during a "pre-receive" hook. For
 all other branches (^refs/heads) the users have only update (U) rights.
 
+=head1 EXPORTS
+
+This module exports two routines that can be used directly without
+using all of Git::Hooks infrastructure.
+
+=head2 check_affected_refs GIT
+
+This is the routine used to implement the C<update> and the
+C<pre-receive> hooks. It needs a C<Git::More> object.
+
 =head1 REFERENCES
 
 This script is heavily inspired (and, in some places, derived) from
 the update-paranoid example hook which comes with the Git distribution
 (L<https://github.com/gitster/git/blob/b12905140a8239ac687450ad43f18b5f0bcfb62e/contrib/hooks/update-paranoid>).
+
+=head1 AUTHOR
+
+Gustavo L. de M. Chaves <gnustavo@cpan.org>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2012 by CPqD <www.cpqd.com.br>.
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
