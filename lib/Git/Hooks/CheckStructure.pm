@@ -15,17 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+package Git::Hooks::CheckStructure;
+{
+  $Git::Hooks::CheckStructure::VERSION = '0.024';
+}
+# ABSTRACT: Git::Hooks plugin for ref/file structure validation.
+
 use 5.010;
 use utf8;
 use strict;
 use warnings;
-
-package Git::Hooks::CheckStructure;
-{
-  $Git::Hooks::CheckStructure::VERSION = '0.023';
-}
-# ABSTRACT: Git::Hooks plugin for ref/file structure validation.
-
 use Git::Hooks qw/:DEFAULT :utils/;
 use Data::Util qw(:check);
 use File::Slurp;
@@ -42,7 +41,7 @@ my $Config = hook_config($HOOK);
 
 sub file_structure {
     return unless exists $Config->{file};
-    $@ = undef;
+    local $@ = undef;
     state $structure = eval { eval_gitconfig($Config->{file}[-1]) };
     die "$HOOK: $@\n" if $@;
     return $structure;
@@ -50,69 +49,81 @@ sub file_structure {
 
 sub ref_structure {
     return unless exists $Config->{ref};
-    $@ = undef;
+    local $@ = undef;
     state $structure = eval { eval_gitconfig($Config->{ref}[-1]) };
     die "$HOOK: $@\n" if $@;
     return $structure;
 }
 
+sub check_array_structure {
+    my ($structure, $path) = @_;
+
+    return (0, "syntax error: odd number of elements in structure spec, while checking")
+        unless scalar(@$structure) % 2 == 0;
+    return (0, "the component ($path->[0]) should be a DIR in")
+        if @$path < 2;
+    shift @$path;
+    # Return ok if the directory doesn't have subcomponents.
+    return (1) if @$path == 1 && length($path->[0]) == 0;
+
+    for (my $s=0; $s<$#$structure; $s+=2) {
+        my ($lhs, $rhs) = @{$structure}[$s, $s+1];
+        if (is_string($lhs)) {
+            if ($path->[0] eq $lhs) {
+                return check_structure($rhs, $path);
+            } elsif (is_integer($lhs)) {
+                if ($lhs) {
+                    return check_structure($rhs, $path);
+                } elsif (is_string($rhs)) {
+                    return (0, "$rhs, while checking");
+                } else {
+                    return (0, "syntax error: the right hand side of a number must be a string, while checking");
+                }
+            }
+            # next
+        } elsif (is_rx($lhs)) {
+            if ($path->[0] =~ $lhs) {
+                return check_structure($rhs, $path);
+            }
+            # next
+        } else {
+            my $what = ref $lhs;
+            return (0, "syntax error: the left hand side of arrays in the structure spec must be scalars or qr/Regexes/, not $what, while checking");
+        }
+    }
+    return (0, "the component ($path->[0]) is not allowed in");
+}
+
+sub check_string_structure {
+    my ($structure, $path) = @_;
+
+    if ($structure eq 'DIR') {
+        return (1) if @$path > 1;
+        return (0, "the component '$path->[0]' should be a DIR in");
+    } elsif ($structure eq 'FILE') {
+        return (0, "the component '$path->[0]' should be a FILE in") if @$path > 1;
+        return (1);
+    } elsif (is_integer($structure)) {
+        return (1) if $structure;
+        return (0, "invalid component '$path->[0]'");
+    } else {
+        return (0, "syntax error: unknown string spec '$structure', while checking");
+    }
+    return (0, "the component ($path->[0]) is not allowed in");
+}
+
 sub check_structure {
     my ($structure, $path) = @_;
 
-    @$path > 0 or die "$HOOK(check_structure): Internal error!";
+    @$path > 0 or die "$HOOK(check_structure): Internal error!\n";
 
     if (is_array_ref($structure)) {
-	return (0, "syntax error: odd number of elements in structure spec, while checking")
-	    unless scalar(@$structure) % 2 == 0;
-	return (0, "the component ($path->[0]) should be a DIR in")
-	    unless @$path > 1;
-	shift @$path;
-	# Return ok if the directory doesn't have subcomponents.
-	return (1) if @$path == 1 && length($path->[0]) == 0;
-
-	for (my $s=0; $s<$#$structure; $s+=2) {
-	    my ($lhs, $rhs) = @{$structure}[$s, $s+1];
-	    if (is_string($lhs)) {
-		if ($path->[0] eq $lhs) {
-		    return check_structure($rhs, $path);
-		} elsif (is_integer($lhs)) {
-		    if ($lhs) {
-			return check_structure($rhs, $path);
-		    } elsif (is_string($rhs)) {
-			return (0, "$rhs, while checking");
-		    } else {
-			return (0, "syntax error: the right hand side of a number must be a string, while checking");
-		    }
-		}
-		# next
-	    } elsif (is_rx($lhs)) {
-		if ($path->[0] =~ $lhs) {
-		    return check_structure($rhs, $path);
-		}
-		# next
-	    } else {
-		my $what = ref $lhs;
-		return (0, "syntax error: the left hand side of arrays in the structure spec must be scalars or qr/Regexes/, not $what, while checking");
-	    }
-	}
-	return (0, "the component ($path->[0]) is not allowed in");
+        return check_array_structure($structure, $path);
     } elsif (is_string($structure)) {
-	if ($structure eq 'DIR') {
-	    return (1) if @$path > 1;
-	    return (0, "the component '$path->[0]' should be a DIR in");
-	} elsif ($structure eq 'FILE') {
-	    return (0, "the component '$path->[0]' should be a FILE in") if @$path > 1;
-	    return (1);
-	} elsif (is_integer($structure)) {
-	    return (1) if $structure;
-	    return (0, "invalid component '$path->[0]'");
-	} else {
-	    return (0, "syntax error: unknown string spec '$structure', while checking");
-	}
-	return (0, "the component ($path->[0]) is not allowed in");
+        return check_string_structure($structure, $path);
     } else {
-	my $what = ref $structure;
-	return (0, "syntax error: invalid reference to a $what in the structure spec, while checking");
+        my $what = ref $structure;
+        return (0, "syntax error: invalid reference to a $what in the structure spec, while checking");
     }
 }
 
@@ -120,11 +131,11 @@ sub check_added_files {
     my ($files) = @_;
     my @errors;
     foreach my $file (sort keys %$files) {
-	# Split the $file path in its components. We prefix $file with
-	# a slash to make it look like an absolute path for
-	# check_structure.
-	my ($code, $error) = check_structure(file_structure(), [split '/', "/$file"]);
-	push @errors, "$error: $file" if $code == 0;
+        # Split the $file path in its components. We prefix $file with
+        # a slash to make it look like an absolute path for
+        # check_structure.
+        my ($code, $error) = check_structure(file_structure(), [split '/', "/$file"]);
+        push @errors, "$error: $file" if $code == 0;
     }
     return @errors;
 }
@@ -138,18 +149,20 @@ sub check_ref {
 
     # Check names of newly created refs
     if (my $structure = ref_structure()) {
-	if ($old_commit eq '0' x 40) {
-	    check_structure($structure, [split '/', "/$ref"])
-		or push @errors, "reference name '$ref' not allowed";
-	}
+        if ($old_commit eq '0' x 40) {
+            check_structure($structure, [split '/', "/$ref"])
+                or push @errors, "reference name '$ref' not allowed";
+        }
     }
 
     # Check names of newly added files
     if (file_structure()) {
-	push @errors, check_added_files($git->get_diff_files('--diff-filter=A', $old_commit, $new_commit));
+        push @errors, check_added_files($git->get_diff_files('--diff-filter=A', $old_commit, $new_commit));
     }
 
     die join("\n", "$HOOK: errors in ref '$ref' commits", @errors), "\n" if @errors;
+
+    return;
 }
 
 # This routine can act both as an update or a pre-receive hook.
@@ -159,8 +172,10 @@ sub check_affected_refs {
     return if im_admin();
 
     foreach my $ref (get_affected_refs()) {
-	check_ref($git, $ref);
+        check_ref($git, $ref);
     }
+
+    return;
 }
 
 sub check_commit {
@@ -169,6 +184,8 @@ sub check_commit {
     my @errors = check_added_files($git->get_diff_files('--diff-filter=A', '--cached'));
 
     die join("\n", "$HOOK: errors in commit", @errors), "\n" if @errors;
+
+    return;
 }
 
 # Install hooks
@@ -188,7 +205,7 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.023
+version 0.024
 
 =head1 DESCRIPTION
 
@@ -220,7 +237,7 @@ comply with its structure definition.
 
 =back
 
-=for Pod::Coverage check_added_files check_ref file_structure ref_structure
+=for Pod::Coverage check_added_files check_ref file_structure ref_structure check_array_structure check_string_structure
 
 =head1 NAME
 
@@ -402,7 +419,7 @@ C<Git::More> object.
 This is the main routine of the hook. It gets (usually) an array-ref
 specifying the repository STRUCTURE and a PATH to check against it. It
 returns a tuple, the first value of which is a boolean telling if the
-check was succesful or not. The second value is an error message, in
+check was successful or not. The second value is an error message, in
 case the check failed.
 
 =head1 AUTHOR

@@ -33,7 +33,6 @@ my %WriteMakefileArgs = (
     'Cwd' => '0',
     'File::Copy' => '0',
     'File::Path' => '2.08',
-    'File::Temp' => '0',
     'Test::More' => '0',
     'URI::file' => '0'
   },
@@ -54,6 +53,7 @@ my %WriteMakefileArgs = (
     'File::Basename' => '0',
     'File::Slurp' => '0',
     'File::Spec::Functions' => '0',
+    'File::Temp' => '0',
     'JIRA::Client' => '0',
     'List::MoreUtils' => '0',
     'parent' => '0',
@@ -61,7 +61,7 @@ my %WriteMakefileArgs = (
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.023',
+  'VERSION' => '0.024',
   'test' => {
     'TESTS' => 't/*.t'
   },

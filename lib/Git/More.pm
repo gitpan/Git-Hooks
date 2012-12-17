@@ -1,13 +1,12 @@
-use strict;
-use warnings;
-
 package Git::More;
 {
-  $Git::More::VERSION = '0.023';
+  $Git::More::VERSION = '0.024';
 }
 # ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
 use parent 'App::gh::Git';
 
+use strict;
+use warnings;
 use Error qw(:try);
 use Carp;
 
@@ -15,23 +14,23 @@ sub get_config {
     my ($git) = @_;
 
     unless (exists $git->{more}{config}) {
-	my %config;
-	my ($fh, $ctx) = $git->command_output_pipe(config => '--null', '--list');
-	{
-	    local $/ = "\x0";
-	    while (<$fh>) {
-		chop;		# final \x0
-		my ($option, $value) = split /\n/, $_, 2;
-		my ($section, $key)  = split /\./, $option, 2;
-		push @{$config{$section}{$key}}, $value;
-	    }
-	}
-	try {
-	    $git->command_close_pipe($fh, $ctx);
-	} otherwise {
-	    # No config option found. That's ok.
-	};
-	$git->{more}{config} = \%config;
+        my %config;
+        my ($fh, $ctx) = $git->command_output_pipe(config => '--null', '--list');
+        {
+            local $/ = "\x0";
+            while (<$fh>) {
+                chop;           # final \x0
+                my ($option, $value) = split /\n/, $_, 2;
+                my ($section, $key)  = split /\./, $option, 2;
+                push @{$config{$section}{$key}}, $value;
+            }
+        }
+        try {
+            $git->command_close_pipe($fh, $ctx);
+        } otherwise {
+            # No config option found. That's ok.
+        };
+        $git->{more}{config} = \%config;
     }
 
     return $git->{more}{config};
@@ -40,7 +39,7 @@ sub get_config {
 sub get_current_branch {
     my ($git) = @_;
     foreach ($git->command(branch => '--no-color')) {
-	return $1 if /^\* (.*)/;
+        return $1 if /^\* (.*)/;
     }
     return;
 }
@@ -49,20 +48,20 @@ sub get_commits {
     my ($git, $old_commit, $new_commit) = @_;
     my @commits;
     my ($pipe, $ctx) = $git->command_output_pipe(
-	'rev-list',
-	# See 'git help rev-list' to understand the --pretty argument
-	'--pretty=format:%H%n%T%n%P%n%aN%n%aE%n%ai%n%cN%n%cE%n%ci%n%s%n%n%b%x00',
-	"$old_commit..$new_commit");
+        'rev-list',
+        # See 'git help rev-list' to understand the --pretty argument
+        '--pretty=format:%H%n%T%n%P%n%aN%n%aE%n%ai%n%cN%n%cE%n%ci%n%s%n%n%b%x00',
+        "$old_commit..$new_commit");
     {
-	local $/ = "\x00\n";
-	while (<$pipe>) {
-	    my %commit;
-	    @commit{qw/header commit tree parent
-		       author_name author_email author_date
-		       commmitter_name committer_email committer_date
-		       body/} = split /\n/, $_, 11;
-	    push @commits, \%commit;
-	}
+        local $/ = "\x00\n";
+        while (<$pipe>) {
+            my %commit;
+            @commit{qw/header commit tree parent
+                       author_name author_email author_date
+                       commmitter_name committer_email committer_date
+                       body/} = split /\n/, $_, 11;
+            push @commits, \%commit;
+        }
     }
     $git->command_close_pipe($pipe, $ctx);
     return \@commits;
@@ -72,7 +71,7 @@ sub get_commit_msg {
     my ($git, $commit) = @_;
     my $body = $git->command('rev-list' => '--format=%B', '--max-count=1', $commit);
     $body =~ s/^[^\n]*\n//; # strip first line, which contains the commit id
-    chomp $body;	    # strip last newline
+    chomp $body;            # strip last newline
     return $body;
 }
 
@@ -80,8 +79,8 @@ sub get_diff_files {
     my ($git, @args) = @_;
     my %affected;
     foreach ($git->command(diff => '--name-status', @args)) {
-	my ($status, $name) = split ' ', $_, 2;
-	$affected{$name} = $status;
+        my ($status, $name) = split ' ', $_, 2;
+        $affected{$name} = $status;
     }
     return \%affected;
 }
@@ -99,7 +98,7 @@ Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.023
+version 0.024
 
 =head1 SYNOPSIS
 
@@ -180,7 +179,7 @@ it's usually sub-intended to reside under the 'refs/heads/' ref scope.
 
 =head2 get_commit_msg COMMIT_ID
 
-This method returns the commit message (aka body) of the commit
+This method returns the commit message (a.k.a. body) of the commit
 identified by COMMIT_ID. The result is a string.
 
 =head2 get_commits OLDCOMMIT NEWCOMMIT

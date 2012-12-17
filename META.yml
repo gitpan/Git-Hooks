@@ -7,7 +7,6 @@ build_requires:
   Cwd: 0
   File::Copy: 0
   File::Path: 2.08
-  File::Temp: 0
   Test::More: 0
   URI::file: 0
 configure_requires:
@@ -29,6 +28,7 @@ requires:
   File::Basename: 0
   File::Slurp: 0
   File::Spec::Functions: 0
+  File::Temp: 0
   JIRA::Client: 0
   List::MoreUtils: 0
   parent: 0
@@ -39,4 +39,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 0.023
+version: 0.024
