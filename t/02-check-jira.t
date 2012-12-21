@@ -20,7 +20,7 @@ sub setup_repos_for {
 	# Inject a fake JIRA::Client class definition in order to be able
 	# to test this without a real JIRA server.
 
-	install_hooks($git, <<'EOF');
+	install_hooks($git, <<'EOF', qw/commit-msg update pre-receive/);
 package JIRA::Client;
 
 sub new {
@@ -126,13 +126,13 @@ $repo->command(config => '--replace-all', 'check-jira.unresolved', 0);
 check_can_commit('allow commit if issue can be resolved [GIT-1]');
 $repo->command(config => '--unset-all', 'check-jira.unresolved');
 
-$repo->command(config => '--replace-all', 'check-jira.by-assignee', 'JIRACMT');
-check_cannot_commit('deny commit if cannot get committer [GIT-2]',
-		    qr/Cannot get committer name/);
-
-$ENV{JIRACMT} = 'otheruser';
+$repo->command(config => '--replace-all', 'check-jira.by-assignee', 1);
+$ENV{USER} = 'other';
 check_cannot_commit('deny commit if not by-assignee [GIT-2]',
-		    qr/but should be assigned to you/);
+		    qr/is currently assigned to 'user' but should be assigned to you \(other\)/);
+
+$ENV{USER} = 'user';
+check_can_commit('allow commit if by-assignee [GIT-2]');
 $repo->command(config => '--unset-all', 'check-jira.by-assignee');
 
 check_can_commit('allow commit if valid issue cited [GIT-2]');

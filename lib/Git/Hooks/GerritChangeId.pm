@@ -15,28 +15,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+package Git::Hooks::GerritChangeId;
+{
+  $Git::Hooks::GerritChangeId::VERSION = '0.025';
+}
+# ABSTRACT: Git::Hooks plugin to insert a Change-Id in a commit message.
+
 use 5.010;
 use utf8;
 use strict;
 use warnings;
-
-package Git::Hooks::GerritChangeId;
-{
-  $Git::Hooks::GerritChangeId::VERSION = '0.024';
-}
-# ABSTRACT: Git::Hooks plugin to insert a Change-Id in a commit message.
-
 use Git::Hooks qw/:DEFAULT :utils/;
 use File::Slurp;
 use File::Temp qw/tempfile/;
 use Error qw(:try);
 
 (my $HOOK = __PACKAGE__) =~ s/.*:://;
-
-#############
-# Grok hook configuration, check it and set defaults.
-
-my $Config = hook_config($HOOK);
 
 ##########
 
@@ -187,7 +181,7 @@ Git::Hooks::GerritChangeId - Git::Hooks plugin to insert a Change-Id in a commit
 
 =head1 VERSION
 
-version 0.024
+version 0.025
 
 =head1 DESCRIPTION
 

@@ -14,7 +14,7 @@ require "test-functions.pl";
 
 my ($repo, $filename) = new_repos();
 
-install_hooks($repo);
+install_hooks($repo, undef, qw/commit-msg/);
 
 sub last_log {
     return $repo->get_commit_msg('HEAD');
@@ -46,7 +46,7 @@ sub can_commit {
 }
 
 
-$repo->command(config => "githooks.commit-msg", 'gerrit-change-id');
+$repo->command(config => "githooks.commit-msg", 'GerritChangeId');
 
 # test EmptyMessages
 foreach my $test (
