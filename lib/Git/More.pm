@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.026';
+  $Git::More::VERSION = '0.027';
 }
 # ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
 use parent 'App::gh::Git';
@@ -276,7 +276,7 @@ Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.026
+version 0.027
 
 =head1 SYNOPSIS
 

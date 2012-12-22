@@ -1,5 +1,7 @@
 Revision history for Git-Hooks. -*- text -*-
 
+0.027     2012-12-22 20:24:40 America/Sao_Paulo
+
 0.026     2012-12-22 20:23:22 America/Sao_Paulo
 
         Implement a new plugin Git::Hooks::CheckLog to enforce

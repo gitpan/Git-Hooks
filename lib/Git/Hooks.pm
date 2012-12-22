@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.026';
+  $Git::Hooks::VERSION = '0.027';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -296,7 +296,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.026
+version 0.027
 
 =head1 SYNOPSIS
 
