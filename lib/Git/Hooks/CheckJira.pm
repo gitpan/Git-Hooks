@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '0.025';
+  $Git::Hooks::CheckJira::VERSION = '0.026';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -41,11 +41,15 @@ sub _setup_config {
 
     my $config = $git->get_config();
 
-    # Default matchkey for matching default JIRA keys.
-    $config->{$HOOK}{matchkey}   //= ['\b[A-Z][A-Z]+-\d+\b'];
+    $config->{lc $HOOK} //= {};
 
-    $config->{$HOOK}{require}    //= [1];
-    $config->{$HOOK}{unresolved} //= [1];
+    my $default = $config->{lc $HOOK};
+
+    # Default matchkey for matching default JIRA keys.
+    $default->{matchkey}   //= ['\b[A-Z][A-Z]+-\d+\b'];
+
+    $default->{require}    //= [1];
+    $default->{unresolved} //= [1];
 
     return;
 }
@@ -266,7 +270,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 0.025
+version 0.026
 
 =head1 DESCRIPTION
 

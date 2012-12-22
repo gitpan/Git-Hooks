@@ -9,6 +9,7 @@ dist.ini
 lib/Git/Hooks.pm
 lib/Git/Hooks/CheckAcls.pm
 lib/Git/Hooks/CheckJira.pm
+lib/Git/Hooks/CheckLog.pm
 lib/Git/Hooks/CheckStructure.pm
 lib/Git/Hooks/GerritChangeId.pm
 lib/Git/More.pm
@@ -16,6 +17,7 @@ t/00-load.t
 t/01-setup.t
 t/02-check-acls.t
 t/02-check-jira.t
+t/02-check-log.t
 t/02-check-structure.t
 t/02-externals.t
 t/02-gerrit-change-id.t

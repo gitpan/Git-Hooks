@@ -54,14 +54,13 @@ my %WriteMakefileArgs = (
     'File::Slurp' => '0',
     'File::Spec::Functions' => '0',
     'File::Temp' => '0',
-    'JIRA::Client' => '0',
     'List::MoreUtils' => '0',
     'parent' => '0',
     'strict' => '0',
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.025',
+  'VERSION' => '0.026',
   'test' => {
     'TESTS' => 't/*.t'
   },
