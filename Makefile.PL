@@ -3,6 +3,11 @@ use warnings;
 
 use 5.010;
 
+if ($^O eq 'MSWin32') {
+    warn "I do not support Windows yet. Sorry.\n";
+    exit 0;
+}
+
 # Check if we have a proper git
 chomp(my $git_version = `git version`);
 if ($? == -1) {
@@ -55,12 +60,13 @@ my %WriteMakefileArgs = (
     'File::Spec::Functions' => '0',
     'File::Temp' => '0',
     'List::MoreUtils' => '0',
+    'Text::SpellChecker' => '0',
     'parent' => '0',
     'strict' => '0',
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.027',
+  'VERSION' => '0.028',
   'test' => {
     'TESTS' => 't/*.t'
   },

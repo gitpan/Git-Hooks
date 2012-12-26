@@ -20,6 +20,7 @@ meta-spec:
 name: Git-Hooks
 recommends:
   JIRA::Client: 0
+  Text::SpellChecker: 0
 requires:
   App::gh: 0.56
   App::gh::Git: 0
@@ -32,6 +33,7 @@ requires:
   File::Spec::Functions: 0
   File::Temp: 0
   List::MoreUtils: 0
+  Text::SpellChecker: 0
   parent: 0
   perl: 5.010
   strict: 0
@@ -40,4 +42,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 0.027
+version: 0.028
