@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.028';
+  $Git::Hooks::VERSION = '0.029';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -296,7 +296,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.028
+version 0.029
 
 =head1 SYNOPSIS
 
@@ -530,11 +530,20 @@ Integrate Git with the JIRA L<http://www.atlassian.com/software/jira/>phase
 ticketing system by requiring that every commit message cites valid
 JIRA issues.
 
+=item Git::Hooks::CheckLog
+
+Check commit log messages formatting.
+
 =item Git::Hooks::CheckStructure
 
 Check if newly added files and references (branches and tags) comply
 with specified policies, so that you can impose a strict structure to
 the repository's file and reference hierarchies.
+
+=item Git::Hooks::GerritChangeId
+
+Inserts a C<Change-Id> line in the commit log message to allow
+integration with Gerrit's code review system.
 
 =back
 

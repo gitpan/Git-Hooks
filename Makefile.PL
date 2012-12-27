@@ -60,13 +60,12 @@ my %WriteMakefileArgs = (
     'File::Spec::Functions' => '0',
     'File::Temp' => '0',
     'List::MoreUtils' => '0',
-    'Text::SpellChecker' => '0',
     'parent' => '0',
     'strict' => '0',
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.028',
+  'VERSION' => '0.029',
   'test' => {
     'TESTS' => 't/*.t'
   },
