@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.030';
+  $Git::Hooks::CheckStructure::VERSION = '0.031';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -30,17 +30,18 @@ use Data::Util qw(:check);
 use File::Slurp;
 use Error qw(:try);
 
-(my $HOOK = __PACKAGE__) =~ s/.*:://;
+my $PKG = __PACKAGE__;
+(my $CFG = __PACKAGE__) =~ s/.*::/githooks./;
 
 ##########
 
 sub get_structure {
     my ($git, $what) = @_;
 
-    if (my $value = $git->config($HOOK => $what)) {
+    if (my $value = $git->config($CFG => $what)) {
         local $@ = undef;
         my $structure = eval {eval_gitconfig($value)};
-        die "$HOOK: $@\n" if $@;
+        die "$PKG: $@\n" if $@;
         return $structure;
     } else {
         return;
@@ -107,7 +108,7 @@ sub check_string_structure {
 sub check_structure {
     my ($structure, $path) = @_;
 
-    @$path > 0 or die "$HOOK(check_structure): Internal error!\n";
+    @$path > 0 or die "$PKG(check_structure): Internal error!\n";
 
     if (is_array_ref($structure)) {
         return check_array_structure($structure, $path);
@@ -152,7 +153,7 @@ sub check_ref {
         push @errors, check_added_files($git, $git->get_diff_files('--diff-filter=A', $old_commit, $new_commit));
     }
 
-    die join("\n", "$HOOK: errors in ref '$ref' commits", @errors), "\n" if @errors;
+    die join("\n", "$PKG: errors in ref '$ref' commits", @errors), "\n" if @errors;
 
     return;
 }
@@ -175,7 +176,7 @@ sub check_commit {
 
     my @errors = check_added_files($git, $git->get_diff_files('--diff-filter=A', '--cached'));
 
-    die join("\n", "$HOOK: errors in commit", @errors), "\n" if @errors;
+    die join("\n", "$PKG: errors in commit", @errors), "\n" if @errors;
 
     return;
 }
@@ -197,7 +198,7 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.030
+version 0.031
 
 =head1 DESCRIPTION
 
@@ -239,7 +240,7 @@ CheckStructure - Git::Hooks plugin for ref/file structure validation.
 
 The plugin is configured by the following git options.
 
-=head2 CheckStructure.file STRUCTURE
+=head2 githooks.checkstructure.file STRUCTURE
 
 This directive specifies the repository file structure, causing the
 push to abort if it adds any file that does not comply.
@@ -299,10 +300,10 @@ and the hook fails.
 
 =back
 
-You can specify the CheckStructure.file structure using either an
-C<eval:> or a C<file:> prefixed value, because they have to be
-evaluated as Perl expressions. The later is probably more convenient
-for most cases.
+You can specify the githooks.checkstructure.file structure using
+either an C<eval:> or a C<file:> prefixed value, because they have to
+be evaluated as Perl expressions. The later is probably more
+convenient for most cases.
 
 Let's see an example to make things clearer. Suppose the code below is
 in a file called C<hooks/file-structure.def> under the repository
@@ -337,9 +338,9 @@ root.
 In order to make the plugin read the specification from the file,
 configure it like this:
 
-    git config CheckStructure.file file:hooks/file-structure.def
+    git config githooks.checkstructure.file file:hooks/file-structure.def
 
-=head2 CheckStructure.ref STRUCTURE
+=head2 githooks.checkstructure.ref STRUCTURE
 
 This directive specifies the repository ref structure, causing the
 push to abort if it adds any reference (branch, tag, etc.) that does
@@ -347,7 +348,7 @@ not comply.
 
 The STRUCTURE argument must be a Perl data structure specifying the
 ref structure recursively in exactly the same way as was explained for
-the C<CheckStructure.file> variable above. Consider that reference
+the C<githooks.checkstructure.file> variable above. Consider that reference
 names always begin with C<refs/>. Branches are kept under
 C<refs/heads/>, tags under C<refs/tags>, remotes under
 C<refs/remotes>, Gerrit branches under C<refs/for>, and so on.
@@ -389,7 +390,7 @@ used in the remote repository of a push.
 In order to make the plugin read the specification from the file,
 configure it like this:
 
-    git config CheckStructure.ref file:hooks/ref-structure.def
+    git config githooks.checkstructure.ref file:hooks/ref-structure.def
 
 =head1 EXPORTS
 
@@ -420,7 +421,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2012 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2013 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

@@ -1,5 +1,18 @@
 Revision history for Git-Hooks. -*- text -*-
 
+0.031     2013-01-05 23:33:50 America/Sao_Paulo
+
+        Move plugin config options to a githooks subsection. For
+        example, the CheckLog.spelling option now is called
+        githooks.checklog.spelling. The new scheme avoids unecessary
+        pollution of the configuration namespace. The plugins that
+        existed up to the previous release can still have their
+        options in the previous place, because we dynamically move
+        them. This is a temporary measure to avoid breaking old
+        configuration. It will probably be removed in the future.
+
+        Rename TODO to TODO.pod and update it with new ideas.
+
 0.030     2012-12-29 23:06:08 America/Sao_Paulo
 
         Fix two bugs. No new features.
@@ -8,7 +21,7 @@ Revision history for Git-Hooks. -*- text -*-
 
         Fix test t/02-check-log.t requirement of Text::SpellChecker.
 
-        Recomends Text::SpellChecker instead of requiring it, as it's
+        Recommends Text::SpellChecker instead of requiring it, as it's
         only needed for the Git::Hooks::CheckLog plugin.
 
         Update TODO file.
@@ -42,7 +55,7 @@ Revision history for Git-Hooks. -*- text -*-
         of an environment variable. But this was duplicating poorly
         the functionality of the githooks.userenv global option. So, I
         changed its meaning to now require a boolean (integer). If
-        true it now checks if the authenticated_user (as infered by
+        true it now checks if the authenticated_user (as inferred by
         the githooks.userenv option) is the current issue's assignee.
 
         * INCOMPATIBLE CHANGES AFFECTING PLUGIN DEVELOPERS:
@@ -56,7 +69,7 @@ Revision history for Git-Hooks. -*- text -*-
         The Git::Hooks::grok_userenv routine was transformed into the
         Git::More::authenticated_user method.
 
-        The Git::Hooks::git_config routine was tranformed into the
+        The Git::Hooks::git_config routine was transformed into the
         Git::More::config method.
 
         The method Git::More::get_commits now returns a list of
@@ -143,7 +156,7 @@ Revision history for Git-Hooks. -*- text -*-
 0.018     2012-11-06 21:49:20 America/Sao_Paulo
 
 	Fix a bug that prevented installed hooks to be invoked in the
-	absense of any configured plugins. This was reported to me by
+	absence of any configured plugins. This was reported to me by
 	Mike South. Thanks!
 
 0.017     2012-10-31 10:45:10 America/Sao_Paulo

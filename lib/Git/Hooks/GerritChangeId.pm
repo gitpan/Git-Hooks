@@ -17,7 +17,7 @@
 
 package Git::Hooks::GerritChangeId;
 {
-  $Git::Hooks::GerritChangeId::VERSION = '0.030';
+  $Git::Hooks::GerritChangeId::VERSION = '0.031';
 }
 # ABSTRACT: Git::Hooks plugin to insert a Change-Id in a commit message.
 
@@ -30,7 +30,8 @@ use File::Slurp;
 use File::Temp qw/tempfile/;
 use Error qw(:try);
 
-(my $HOOK = __PACKAGE__) =~ s/.*:://;
+my $PKG = __PACKAGE__;
+(my $CFG = __PACKAGE__) =~ s/.*::/githooks./;
 
 ##########
 
@@ -155,7 +156,7 @@ sub rewrite_message {
     my ($git, $commit_msg_file) = @_;
 
     my $msg = read_file($commit_msg_file);
-    defined $msg or die "$HOOK: Can't open file '$commit_msg_file' for reading: $!\n";
+    defined $msg or die "$PKG: Can't open file '$commit_msg_file' for reading: $!\n";
 
     my $new_msg = insert_change_id($git, $msg);
 
@@ -181,7 +182,7 @@ Git::Hooks::GerritChangeId - Git::Hooks plugin to insert a Change-Id in a commit
 
 =head1 VERSION
 
-version 0.030
+version 0.031
 
 =head1 DESCRIPTION
 
@@ -265,7 +266,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2012 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2013 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

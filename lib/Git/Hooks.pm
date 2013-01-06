@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.030';
+  $Git::Hooks::VERSION = '0.031';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -296,7 +296,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.030
+version 0.031
 
 =head1 SYNOPSIS
 
@@ -595,7 +595,11 @@ exit with an appropriate error message.
 Git::Hooks is configured via Git's own configuration
 infrastructure. There are a few global options which are described
 below. Each plugin may define other specific options which are
-described in their own documentation.
+described in their own documentation. The options specific to a plugin
+usually are contained in a configuration subsection of section
+C<githooks>, named after the plugin base name. For example, the
+C<Git::Hooks::CheckAcls> plugin has its options contained in the
+configuration subsection C<githooks.checkacls>.
 
 You should get comfortable with C<git config> command (read C<git help
 config>) to know how to configure Git::Hooks.
@@ -960,7 +964,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2012 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2013 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckAcls;
 {
-  $Git::Hooks::CheckAcls::VERSION = '0.030';
+  $Git::Hooks::CheckAcls::VERSION = '0.031';
 }
 # ABSTRACT: Git::Hooks plugin for branch/tag access control.
 
@@ -29,7 +29,8 @@ use File::Slurp;
 use Error qw(:try);
 use Git::Hooks qw/:DEFAULT :utils/;
 
-(my $HOOK = __PACKAGE__) =~ s/.*:://;
+my $PKG = __PACKAGE__;
+(my $CFG = __PACKAGE__) =~ s/.*::/githooks./;
 
 ##########
 
@@ -38,7 +39,7 @@ sub grok_acls {
 
     my @acls;                   # This will hold the ACL specs
 
-    foreach my $acl ($git->config($HOOK => 'acl')) {
+    foreach my $acl ($git->config($CFG => 'acl')) {
         # Interpolate environment variables embedded as "{VAR}".
         $acl =~ s/{(\w+)}/$ENV{$1}/ige;
         push @acls, [split / /, $acl, 3];
@@ -88,7 +89,7 @@ sub check_ref {
         my ($who, $what, $refspec) = @$acl;
         next unless match_user($git, $who);
         next unless match_ref($ref, $refspec);
-        $what =~ /[^CRUD-]/ and die "$HOOK: invalid acl 'what' component ($what).\n";
+        $what =~ /[^CRUD-]/ and die "$PKG: invalid acl 'what' component ($what).\n";
         return if index($what, $op) != -1;
     }
 
@@ -102,7 +103,7 @@ sub check_ref {
 
     my $myself = $git->authenticated_user();
 
-    die "$HOOK: you ($myself) cannot $op{$op} ref $ref.\n";
+    die "$PKG: you ($myself) cannot $op{$op} ref $ref.\n";
 }
 
 # This routine can act both as an update or a pre-receive hook.
@@ -134,7 +135,7 @@ Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
 
 =head1 VERSION
 
-version 0.030
+version 0.031
 
 =head1 DESCRIPTION
 
@@ -174,19 +175,19 @@ Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
 
 The plugin is configured by the following git options.
 
-=head2 CheckAcls.userenv STRING
+=head2 githooks.checkacls.userenv STRING
 
 This variable is deprecated. Please, use the C<githooks.userenv>
 variable, which is defined in the Git::Hooks module. Please, see its
 documentation to understand it.
 
-=head2 CheckAcls.admin USERSPEC
+=head2 githooks.checkacls.admin USERSPEC
 
 This variable is deprecated. Please, use the C<githooks.admin>
 variable, which is defined in the Git::Hooks module. Please, see its
 documentation to understand it.
 
-=head2 CheckAcls.acl ACL
+=head2 githooks.checkacls.acl ACL
 
 The authorization specification for a repository is defined by the set
 of ACLs defined by this option. Each ACL specify 'who' has 'what' kind
@@ -292,7 +293,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2012 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2013 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

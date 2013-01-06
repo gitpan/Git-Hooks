@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.030';
+  $Git::More::VERSION = '0.031';
 }
 # ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
 use parent 'App::gh::Git';
@@ -64,6 +64,26 @@ sub _compatibilize_config {
                 $config->{githooks}{$var} = $config->{$plugin}{$var};
                 next;
             }
+        }
+    }
+
+    # Up to version 0.030 each plugin had its own configuration
+    # section. From v0.031 on each plugin uses a subsection of the
+    # "githooks" section for its configuration options. In order to
+    # maintain compatibility we move the plugin's section variables to
+    # its newer subsection location. But only for the plugins that
+    # existed up to v0.030.
+
+    foreach my $section (qw/checkacls checkjira checklog checkstructure gerritchangeid/) {
+        next unless exists $config->{$section};
+        if (exists $config->{"githooks.$section"}) {
+            # If there already exists a subsection we consider this a
+            # conflict and tell the user to fix it.
+            die  __PACKAGE__, ": you have incompatible configuration sections: '$section' and 'githooks.$section'.\n",
+                "Please, rename all variables from section '$section' to the subsection 'githooks.$section'.\n";
+        } else {
+            # Otherwise, we can simply turn the section into a subsection
+            $config->{"githooks.$section"} = delete $config->{$section};
         }
     }
 
@@ -288,7 +308,7 @@ Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.030
+version 0.031
 
 =head1 SYNOPSIS
 
@@ -296,7 +316,7 @@ version 0.030
 
     my $git = Git::More->repository();
 
-    my $config  = $git->get_config('section');
+    my $config  = $git->get_config();
     my $branch  = $git->get_current_branch();
     my $commits = $git->get_commits($oldcommit, $newcommit);
     my $message = $git->get_commit_msg('HEAD');
@@ -336,17 +356,17 @@ Then, it'll return this hash:
             'a' => [1],
             'b' => [2, 3],
         },
-        'section2' => {
-            'x.a' => ['A'],
-            'x.b' => ['B', 'C'],
+        'section2.x' => {
+            'a' => ['A'],
+            'b' => ['B', 'C'],
         },
     }
 
-The first level keys are the part of the option names before the first
-dot. The second level keys are everything after the first dot in the
+The first level keys are the part of the option names before the last
+dot. The second level keys are everything after the last dot in the
 option names. You won't get more levels than two. In the example
 above, you can see that the option "section2.x.a" is split in two:
-"section2" in the first level and "x.a" in the second.
+"section2.x" in the first level and "a" in the second.
 
 The values are always array-refs, even it there is only one value to a
 specific option. For some options, it makes sense to have a list of
@@ -359,7 +379,7 @@ So, if you want to treat an option as single-valued, you should fetch
 it like this:
 
      $h->{section1}{a}[-1]
-     $h->{section2}{'x.a'}[-1]
+     $h->{'section2.x'}{a}[-1]
 
 =head2 config SECTION VARIABLE
 
@@ -479,7 +499,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2012 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2013 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

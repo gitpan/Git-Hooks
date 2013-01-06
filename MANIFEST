@@ -4,7 +4,7 @@ MANIFEST
 META.yml
 Makefile.PL
 README
-TODO
+TODO.pod
 dist.ini
 lib/Git/Hooks.pm
 lib/Git/Hooks/CheckAcls.pm
