@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.031';
+  $Git::Hooks::CheckStructure::VERSION = '0.032';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -198,13 +198,13 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.031
+version 0.032
 
 =head1 DESCRIPTION
 
-This Git::Hooks plugin can act as any of the below hooks to check if
-the files and references (branches and tags) added to the repository
-are allowed by their structure specification. If they don't, the
+This Git::Hooks plugin hooks itself to the hooks below to check if the
+files and references (branches and tags) added to the repository are
+allowed by their structure specification. If they don't, the
 commit/push is aborted.
 
 =over
@@ -229,6 +229,11 @@ checking if the references and files being added to the repository
 comply with its structure definition.
 
 =back
+
+To enable it you should add it to the githooks.plugin configuration
+option:
+
+    git config --add githooks.plugin CheckStructure
 
 =for Pod::Coverage check_added_files check_ref get_structure check_array_structure check_string_structure
 

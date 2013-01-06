@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '0.031';
+  $Git::Hooks::CheckJira::VERSION = '0.032';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -271,11 +271,11 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 0.031
+version 0.032
 
 =head1 DESCRIPTION
 
-This Git::Hooks plugin can act as any of the below hooks to guarantee
+This Git::Hooks plugin hooks itself to the hooks below to guarantee
 that every commit message cites at least one valid JIRA issue key in
 its log message, so that you can be certain that every change has a
 proper change request (a.k.a. ticket) open.
@@ -306,12 +306,10 @@ issues are cited by their keys which, by default, consist of a
 sequence of uppercase letters separated by an hyphen from a sequence of
 digits. E.g., C<CDS-123>, C<RT-1>, and C<GIT-97>.
 
-To enable it you should define the appropriate Git configuration
+To enable it you should add it to the githooks.plugin configuration
 option:
 
-    git config --add githooks.commit-msg  CheckJira
-    git config --add githooks.update      CheckJira
-    git config --add githooks.pre-receive CheckJira
+    git config --add githooks.plugin CheckJira
 
 =for Pod::Coverage check_codes check_commit_msg check_ref ferror get_issue grok_msg_jiras
 

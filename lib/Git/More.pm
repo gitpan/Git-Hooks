@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.031';
+  $Git::More::VERSION = '0.032';
 }
 # ABSTRACT: An extension of App::gh::Git with some goodies for hook developers.
 use parent 'App::gh::Git';
@@ -84,6 +84,20 @@ sub _compatibilize_config {
         } else {
             # Otherwise, we can simply turn the section into a subsection
             $config->{"githooks.$section"} = delete $config->{$section};
+        }
+    }
+
+    # Up to v0.031 the plugins had to be hooked explicitly to the
+    # hooks they implement by configuring the githooks.HOOK
+    # options. From v0.032 on the plugins can hook themselves to any
+    # hooks they want. The users have simply to tell which plugins
+    # they are interested in by adding them to the githooks.plugin
+    # option. Here we construct this option from the HOOK options if
+    # it's not configured yet.
+
+    unless (exists $config->{'githooks.plugin'}) {
+        foreach my $hook (grep {exists $config->{githooks}{$_}} qw/commit-msg pre-commit pre-receive post-receive update/) {
+            push @{$config->{githooks}{plugin}}, @{$config->{githooks}{$hook}};
         }
     }
 
@@ -308,7 +322,7 @@ Git::More - An extension of App::gh::Git with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.031
+version 0.032
 
 =head1 SYNOPSIS
 

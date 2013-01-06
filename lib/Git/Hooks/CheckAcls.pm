@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckAcls;
 {
-  $Git::Hooks::CheckAcls::VERSION = '0.031';
+  $Git::Hooks::CheckAcls::VERSION = '0.032';
 }
 # ABSTRACT: Git::Hooks plugin for branch/tag access control.
 
@@ -135,11 +135,11 @@ Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
 
 =head1 VERSION
 
-version 0.031
+version 0.032
 
 =head1 DESCRIPTION
 
-This Git::Hooks plugin can act as any of the below hooks to guarantee
+This Git::Hooks plugin hooks itself to the hooks below to guarantee
 that only allowed users can push commits and tags to specific
 branches.
 
@@ -159,11 +159,10 @@ branch.
 
 =back
 
-To enable it you should define the appropriate Git configuration
+To enable it you should add it to the githooks.plugin configuration
 option:
 
-    git config --add githooks.update      CheckAcls
-    git config --add githooks.pre-receive CheckAcls
+    git config --add githooks.plugin CheckAcls
 
 =for Pod::Coverage check_ref grok_acls match_ref
 
