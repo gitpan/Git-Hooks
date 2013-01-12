@@ -21,7 +21,7 @@ our $HooksDir = catfile(rel2abs(curdir()), 'hooks');
 
 our $git_version;
 try {
-    $git_version = App::gh::Git::command_oneline('version');
+    $git_version = Git::command_oneline('version');
 } otherwise {
     $git_version = 'unknown';
 };
@@ -109,7 +109,14 @@ sub new_repos {
     }
 
     try {
-	my ($ok, $exit, $stdout) = test_command(undef, 'init', '-q', $repodir);
+        # It would be easier to pass a directory argument to git-init
+        # but it started to accept it only on v1.6.5. To support
+        # previous gits we chdir to $repodir to avoid the need to pass
+        # the argument. Then we have to go back to where we were.
+        my $cwd = cwd();
+        chdir $repodir or die "cannot chdir $repodir: $!\n";
+	my ($ok, $exit, $stdout) = test_command(undef, 'init', '-q');
+        chdir $cwd;
 	unless ($ok) {
 	    throw Error::Simple("'git init -q $repodir': exit=$exit, stdout=\n$stdout\n");
 	}

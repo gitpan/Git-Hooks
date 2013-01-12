@@ -22,9 +22,8 @@ recommends:
   JIRA::Client: 0
   Text::SpellChecker: 0
 requires:
-  App::gh: 0.56
-  App::gh::Git: 0
   Carp: 0
+  Cwd: 0
   Data::Util: 0
   Error: 0
   Exporter: 0
@@ -41,4 +40,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 0.032
+version: 0.033

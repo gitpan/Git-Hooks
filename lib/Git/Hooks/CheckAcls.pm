@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckAcls;
 {
-  $Git::Hooks::CheckAcls::VERSION = '0.032';
+  $Git::Hooks::CheckAcls::VERSION = '0.033';
 }
 # ABSTRACT: Git::Hooks plugin for branch/tag access control.
 
@@ -39,7 +39,7 @@ sub grok_acls {
 
     my @acls;                   # This will hold the ACL specs
 
-    foreach my $acl ($git->config($CFG => 'acl')) {
+    foreach my $acl ($git->get_config($CFG => 'acl')) {
         # Interpolate environment variables embedded as "{VAR}".
         $acl =~ s/{(\w+)}/$ENV{$1}/ige;
         push @acls, [split / /, $acl, 3];
@@ -135,7 +135,7 @@ Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
 
 =head1 VERSION
 
-version 0.032
+version 0.033
 
 =head1 DESCRIPTION
 
