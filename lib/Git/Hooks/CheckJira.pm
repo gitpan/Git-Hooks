@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '0.033';
+  $Git::Hooks::CheckJira::VERSION = '0.034';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -271,7 +271,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 0.033
+version 0.034
 
 =head1 DESCRIPTION
 
@@ -282,18 +282,18 @@ proper change request (a.k.a. ticket) open.
 
 =over
 
-=item C<commit-msg>
+=item * B<commit-msg>
 
 This hook is invoked during the commit, to check if the commit message
 cites valid JIRA issues.
 
-=item C<update>
+=item * B<update>
 
 This hook is invoked multiple times in the remote repository during
 C<git push>, once per branch being updated, to check if the commit
 message cites valid JIRA issues.
 
-=item C<pre-receive>
+=item * B<pre-receive>
 
 This hook is invoked once in the remote repository during C<git push>,
 to check if the commit message cites valid JIRA issues.
@@ -422,20 +422,20 @@ arguments:
 
 =over
 
-=item GIT
+=item * B<GIT>
 
 The Git repository object used to grok information about the commit.
 
-=item COMMITID
+=item * B<COMMITID>
 
 The SHA-1 id of the Git commit. It is undef in the C<commit-msg> hook,
 because there is no commit yet.
 
-=item JIRA
+=item * B<JIRA>
 
 The JIRA::Client object used to talk to the JIRA server.
 
-=item ISSUES...
+=item * B<ISSUES...>
 
 The remaining arguments are RemoteIssue objects representing the
 issues being cited by the commit's message.
@@ -463,9 +463,9 @@ message.
 
 =head1 SEE ALSO
 
-C<Git::More>
+B<Git::More>
 
-C<JIRA::Client>
+B<JIRA::Client>
 
 =head1 REFERENCES
 

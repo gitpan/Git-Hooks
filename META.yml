@@ -4,9 +4,9 @@ author:
   - 'Gustavo L. de M. Chaves <gnustavo@cpan.org>'
 build_requires:
   Config: 0
-  Cwd: 0
-  File::Copy: 0
   File::Path: 2.08
+  File::Remove: 0
+  File::pushd: 0
   Test::More: 0
   URI::file: 0
 configure_requires:
@@ -40,4 +40,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 0.033
+version: 0.034

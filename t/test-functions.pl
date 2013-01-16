@@ -3,21 +3,26 @@
 use 5.010;
 use strict;
 use warnings;
-use Cwd;
-use File::Temp qw/tempdir/;
-use File::Spec::Functions ':ALL';
-use File::Copy;
-use File::Slurp;
-use URI::file;
 use Config;
+use File::Remove 'remove';
+use File::Slurp;
+use File::Spec::Functions qw/catdir catfile/;
+use File::Temp 'tempdir';
+use File::pushd;
+use URI::file;
 use Git::More;
-use Error qw(:try);
+use Error qw':try';
 
 # Make sure the git messages come in English.
 $ENV{LC_MESSAGES} = 'C';
 
-our $T;
-our $HooksDir = catfile(rel2abs(curdir()), 'hooks');
+# It's better to perform all tests in a temporary directory because
+# otherwise the author runs the risk of messing with its local
+# Git::Hooks git repository.
+
+our $T = tempdir('githooks.XXXXX', TMPDIR => 1, CLEANUP => $ENV{REPO_CLEANUP} || 1);
+chdir $T or die "Can't chdir $T: $!";
+END { chdir '/' }
 
 our $git_version;
 try {
@@ -74,7 +79,10 @@ EOF
 
 	print $fh $extra_perl if defined $extra_perl;
 
+        # Not all hooks defined the GIT_DIR environment variable
+        # (e.g., pre-rebase doesn't).
 	print $fh <<EOF
+\$ENV{GIT_DIR}    = '.git' unless exists \$ENV{GIT_DIR};
 \$ENV{GIT_CONFIG} = "\$ENV{GIT_DIR}/config";
 run_hook(\$0, \@ARGV);
 EOF
@@ -95,12 +103,12 @@ EOF
 }
 
 sub new_repos {
-    my $cleanup = exists $ENV{REPO_CLEANUP} ? $ENV{REPO_CLEANUP} : 1;
-    $T = tempdir('githooks.XXXXX', TMPDIR => 1, CLEANUP => $cleanup);
-
     my $repodir  = catfile($T, 'repo');
     my $filename = catfile($repodir, 'file.txt');
     my $clonedir = catfile($T, 'clone');
+
+    # Remove the directories recursively to create new ones.
+    remove(\1, $repodir, $clonedir);
 
     mkdir $repodir, 0777 or BAIL_OUT("can't mkdir $repodir: $!");
     {
@@ -113,10 +121,10 @@ sub new_repos {
         # but it started to accept it only on v1.6.5. To support
         # previous gits we chdir to $repodir to avoid the need to pass
         # the argument. Then we have to go back to where we were.
-        my $cwd = cwd();
-        chdir $repodir or die "cannot chdir $repodir: $!\n";
-	my ($ok, $exit, $stdout) = test_command(undef, 'init', '-q');
-        chdir $cwd;
+        my ($ok, $exit, $stdout) = do {
+            my $dir = pushd($repodir);
+            test_command(undef, 'init', '-q');
+        };
 	unless ($ok) {
 	    throw Error::Simple("'git init -q $repodir': exit=$exit, stdout=\n$stdout\n");
 	}
@@ -133,7 +141,9 @@ sub new_repos {
 	}
 	my $clone = Git::More->repository(Directory => $clonedir);
 
-	return ($repo, $filename, $clone);
+        $repo->command(remote => 'add', 'clone', $clonedir);
+
+	return ($repo, $filename, $clone, $T);
     } otherwise {
 	my $E = shift;
 	my $ls = `find $T -ls`;	# FIXME: this is non-portable.
@@ -191,6 +201,23 @@ sub test_ok {
     my ($ok, $exit, $stdout) = test_command(@args);
     if ($ok) {
 	pass($testname);
+    } else {
+	fail($testname);
+	diag(" exit=$exit\n stdout=$stdout\n git-version=$git_version\n");
+    }
+    return $ok;
+}
+
+sub test_ok_match {
+    my ($testname, $regex, @args) = @_;
+    my ($ok, $exit, $stdout) = test_command(@args);
+    if ($ok) {
+        if ($stdout =~ $regex) {
+            pass($testname);
+        } else {
+            fail($testname);
+            diag(" did not match regex ($regex)\n stdout=$stdout\n git-version=$git_version\n");
+        }
     } else {
 	fail($testname);
 	diag(" exit=$exit\n stdout=$stdout\n git-version=$git_version\n");

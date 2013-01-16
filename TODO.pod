@@ -4,40 +4,6 @@ The following list is in approximately my order of implementation
 intention. Any comments or other suggestion are welcome at gnustavo AT
 cpan.org.
 
-=head2 Implement the Git::Hooks::SafeRewrite plugin
-
-Implement a plugin to check the safety of rewrites, by detecting when
-we're amending or rebasing commits that have already been pushed. Here
-are some discussion about this:
-
-=over
-
-=item L<http://git.661346.n2.nabble.com/pre-rebase-safety-hook-td1614613.html>
-
-=item L<http://git.apache.org/xmlbeans.git/hooks/pre-rebase.sample>
-
-=item L<http://www.mentby.com/Group/git/rfc-pre-rebase-refuse-to-rewrite-commits-that-are-reachable-from-upstream.html>
-
-=item L<http://git.661346.n2.nabble.com/RFD-Rewriting-safety-warn-before-when-rewriting-published-history-td7254708.html>
-
-=back
-
-The rebase check could be performed in a pre-rebase hook. But there is
-no way to check for an amended commit before it's done. One idea would
-be to record the HEAD's parents in a file during a pre-commit hook and
-produce an alert during a post-commit hook if the HEAD's parents are
-the same. In this case, the alert should provide the command that
-should be performed to revert the amend.
-
-=head2 Find a substitute for App::gh::Git
-
-The C<Git::More> module currently inherits from C<App::gh::Git>,
-augmenting its functionality with some methods useful for hooks and
-caching information to speed up things. The C<App::gh::Git> has some
-problems, though, which led me to want to substitute another Git
-wrapper for it as a base for C<Git::More>. Two of the finest
-candidates on CPAN are C<Git::Wrapper> and C<Git::Repository>.
-
 =head2 Support the WIN32 Platform
 
 Currently we abort the build on C<Makefile.PL>.
@@ -107,3 +73,57 @@ This would allow for all kinds of checks specific for some kinds of
 files. Some interesting ideas here:
 L<http://tech.yipit.com/2011/11/16/183772396/>.
 
+=head2 Implement the Git::Hooks::CheckWhiteSpace plugin
+
+Some people (e.g. Linus Torvalds) prefer spaces, others prefer tabs.
+
+Some people prefer tab size at 8 characters, others prefer at 4.
+
+This plugin should be able to check these preferences for selected
+types of files. Some configuration would be like this:
+
+=over
+
+=item * githooks.checkwhitespace.indentation [tab|space|any]
+
+By default any kind of white-space should be allowed. But one could
+specify B<tab> for tabs only or B<space> for space only.
+
+Note that this checks only the indentation space in each line.
+
+=item * githooks.checkwhitespace.files REGEXP
+
+This multi-valued option defines the files that should be checked. By
+default, no file is checked.
+
+=item * githooks.checkwhitespace.trailing [allow|deny]
+
+By default trailing white space is denied. But one should be able to
+allow it.
+
+=back
+
+This way, the options are fixed for any file. Would it be desirable to
+have different options for different kind of files?
+
+=head2 I18N
+
+Use Locale::TextDomain to internationalize it.
+
+=head2 L10N pt_BR
+
+As a first job after i18n I intend to nationalize it to Brazilian
+Portuguese.
+
+=head2 Support Gerrit hooks
+
+Gerrit is a "web based code review and project management tool for Git
+based projects" (L<https://code.google.com/p/gerrit/>). It's based on
+JGit (L<http://eclipse.org/jgit/>) which, as of 2012-01-14, still
+doesn't support git's standard hooks.
+
+But Gerrit has its own hook infrastructure and we should support it
+(L<http://gerrit-documentation.googlecode.com/svn/Documentation/2.5.1/config-hooks.html>).
+
+The two hooks that seem to be relevant to Git::Hooks's plugins are
+B<patchset-created> and B<ref-updated>.

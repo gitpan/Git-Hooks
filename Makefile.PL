@@ -104,9 +104,9 @@ my %WriteMakefileArgs = (
   'AUTHOR' => 'Gustavo L. de M. Chaves <gnustavo@cpan.org>',
   'BUILD_REQUIRES' => {
     'Config' => '0',
-    'Cwd' => '0',
-    'File::Copy' => '0',
     'File::Path' => '2.08',
+    'File::Remove' => '0',
+    'File::pushd' => '0',
     'Test::More' => '0',
     'URI::file' => '0'
   },
@@ -133,7 +133,7 @@ my %WriteMakefileArgs = (
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.033',
+  'VERSION' => '0.034',
   'test' => {
     'TESTS' => 't/*.t'
   },

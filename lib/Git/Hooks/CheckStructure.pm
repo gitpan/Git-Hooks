@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.033';
+  $Git::Hooks::CheckStructure::VERSION = '0.034';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -198,7 +198,7 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.033
+version 0.034
 
 =head1 DESCRIPTION
 
@@ -209,20 +209,20 @@ commit/push is aborted.
 
 =over
 
-=item C<pre-commit>
+=item * B<pre-commit>
 
 This hook is invoked once in the local repository during a C<git
 commit>. It checks if files being added comply with the file structure
 definition.
 
-=item C<update>
+=item * B<update>
 
 This hook is invoked multiple times in the remote repository during
 C<git push>, once per branch being updated, checking if the references
 and files being added to the repository comply with its structure
 definition.
 
-=item C<pre-receive>
+=item * B<pre-receive>
 
 This hook is invoked once in the remote repository during C<git push>,
 checking if the references and files being added to the repository
@@ -255,7 +255,7 @@ file structure recursively as follows.
 
 =over
 
-=item ARRAY REF
+=item * B<ARRAY REF>
 
 An array ref specifies the contents of a directory. The referenced
 array must contain a pair number of elements. Each pair consists of a
@@ -267,15 +267,15 @@ The NAME_DEF specifies a name in one of these ways:
 
 =over
 
-=item STRING
+=item * B<STRING>
 
 A string specifies the component name literally.
 
-=item qr/REGEXP/
+=item * B<qr/REGEXP/>
 
 A regexp specifies the class of names that match it.
 
-=item NUMBER
+=item * B<NUMBER>
 
 A number may be used as an else-clause. A positive number means that
 any name not yet matched by the previous NAME DEFs must conform to the
@@ -290,12 +290,12 @@ which is sent back to the user.
 If no NAME_DEF matches the component being looked for, then it is a
 structure violation and the hook fails.
 
-=item STRING
+=item * B<STRING>
 
 A string must be one of 'FILE' and 'DIR', specifying what the
 component must be a file or a directory, respectively.
 
-=item NUMBER
+=item * B<NUMBER>
 
 A positive number simply tells that the component can be anything:
 file or directory.
