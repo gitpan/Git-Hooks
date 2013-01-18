@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckRewrite;
 {
-  $Git::Hooks::CheckRewrite::VERSION = '0.034';
+  $Git::Hooks::CheckRewrite::VERSION = '0.035';
 }
 # ABSTRACT: Git::Hooks plugin for checking against unsafe rewrites
 
@@ -35,10 +35,20 @@ my $PKG = __PACKAGE__;
 
 ##########
 
+# Returns the name of a file where we record information about a
+# commit that has to be shared between the pre- and post-commit hooks.
 sub _record_filename {
     my ($git) = @_;
 
     return catfile($git->repo_path(), 'GITHOOKS_CHECKREWRITE');
+}
+
+# Returns all branches containing a specific commit. The command "git
+# branch" returns the branch names prefixed with two characters, which
+# we have to get rid of using substr.
+sub _branches_containing {
+    my ($git, $commit) = @_;
+    return map { substr($_, 2) } $git->command('branch', '-a', '--contains', $commit);
 }
 
 sub record_commit_parents {
@@ -85,7 +95,7 @@ sub check_commit_amend {
     return unless $new_parents eq $old_parents;
 
     # Find all branches containing $old_commit
-    my @branches = $git->command('branch', '--all', '--contains', $old_commit);
+    my @branches = _branches_containing($git, $old_commit);
 
     if (@branches > 0) {
         # $old_commit is reachable by at least one branch, which means
@@ -131,7 +141,7 @@ sub check_rebase {
     my $base_commit = $git->command_oneline('rev-list', '--topo-order', '--reverse', "$upstream..$branch");
 
     # Find all branches containing that commit
-    my @branches = $git->command('branch', '--all', '--contains', $base_commit);
+    my @branches = _branches_containing($git, $base_commit);
 
     if (@branches > 1) {
         # The base commit is reachable by more than one branch, which
@@ -167,7 +177,7 @@ Git::Hooks::CheckRewrite - Git::Hooks plugin for checking against unsafe rewrite
 
 =head1 VERSION
 
-version 0.034
+version 0.035
 
 =head1 DESCRIPTION
 

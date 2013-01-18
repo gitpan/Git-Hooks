@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.034';
+  $Git::Hooks::VERSION = '0.035';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -209,6 +209,28 @@ sub eval_gitconfig {
     return $value;
 }
 
+sub _prepare_receive {
+    my ($git) = @_;
+    # pre-receive and post-receive get the list of affected
+    # commits via STDIN.
+    while (<>) {
+        chomp;
+        my ($old_commit, $new_commit, $ref) = split;
+        $git->set_affected_ref($ref, $old_commit, $new_commit);
+    }
+    return;
+}
+
+my %prepare_hook = (
+    update => sub {
+        my ($git, $ref, $old_commit, $new_commit) = @_;
+        $git->set_affected_ref($ref, $old_commit, $new_commit);
+        return;
+    },
+    'pre-receive'  => \&_prepare_receive,
+    'post-receive' => \&_prepare_receive,
+);
+
 sub run_hook {
     my ($hook_name, @args) = @_;
 
@@ -216,19 +238,9 @@ sub run_hook {
 
     my $git = Git::More->repository();
 
-    # Some hooks (update, pre-receive, and post-receive) affect refs
-    # and associated commit ranges. Let's grok them at once.
-    if ($hook_name eq 'update') {
-        my ($ref, $old_commit, $new_commit) = @args;
-        $git->set_affected_ref($ref, $old_commit, $new_commit);
-    } elsif ($hook_name =~ /^(?:pre|post)-receive$/) {
-        # pre-receive and post-receive get the list of affected
-        # commits via STDIN.
-        while (<>) {
-            chomp;
-            my ($old_commit, $new_commit, $ref) = split;
-            $git->set_affected_ref($ref, $old_commit, $new_commit);
-        }
+    # Some hooks need some argument munging before we invoke them
+    if (my $prepare = $prepare_hook{$hook_name}) {
+        $prepare->($git, @args);
     }
 
     # Invoke enabled plugins
@@ -245,26 +257,27 @@ sub run_hook {
         );
 
       HOOK:
-        foreach my $hook (uniq @enabled_plugins) {
+        foreach my $plugin (uniq @enabled_plugins) {
+            next if exists $ENV{$plugin} && ! $ENV{$plugin}; # disabled by user
             my $exit = do {
-                if ($hook =~ /::/) {
+                if ($plugin =~ /::/) {
                     # It must be a module name
-                    eval "require $hook"; ## no critic (BuiltinFunctions::ProhibitStringyEval ErrorHandling::RequireCheckingReturnValueOfEval)
+                    eval "require $plugin"; ## no critic (BuiltinFunctions::ProhibitStringyEval ErrorHandling::RequireCheckingReturnValueOfEval)
                 } else {
                     # Otherwise, it's a basename that we must look for
                     # in @plugin_dirs
-                    $hook .= '.pm' unless $hook =~ /\.p[lm]$/i;
-                    my @scripts = grep {-f} map {catfile($_, $hook)} @plugin_dirs;
+                    $plugin .= '.pm' unless $plugin =~ /\.p[lm]$/i;
+                    my @scripts = grep {-f} map {catfile($_, $plugin)} @plugin_dirs;
                     my $script = shift @scripts
-                        or die __PACKAGE__, ": can't find enabled hook $hook.\n";
-                    $hook = $script; # for the error messages below
+                        or die __PACKAGE__, ": can't find enabled hook $plugin.\n";
+                    $plugin = $script; # for the error messages below
                     do $script;
                 }
             };
             unless ($exit) {
-                die __PACKAGE__, ": couldn't parse $hook: $@\n" if $@;
-                die __PACKAGE__, ": couldn't do $hook: $!\n"    unless defined $exit;
-                die __PACKAGE__, ": couldn't run $hook\n";
+                die __PACKAGE__, ": couldn't parse $plugin: $@\n" if $@;
+                die __PACKAGE__, ": couldn't do $plugin: $!\n"    unless defined $exit;
+                die __PACKAGE__, ": couldn't run $plugin\n";
             }
         }
     }
@@ -303,7 +316,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.034
+version 0.035
 
 =head1 SYNOPSIS
 
@@ -660,6 +673,25 @@ the configuration, then it will be simply C<required> as a normal
 module. For example:
 
     $ git config --add githooks.plugin My::Hook::CheckSomething
+
+Finally, you may temporarily disable a plugin by assigning to "0" an
+environment variable with its name. This is useful sometimes, when you
+are denied some perfectly fine commit by one of the check plugins. For
+example, suppose you got an error from the CheckLog plugin because you
+used an uncommon word that is not in the system's dictionary yet. If
+you don't intend to use the word again you can bypass all CheckLog
+checks this way:
+
+    $ CheckLog=0 git commit
+
+This works for every hook. The environment variable name has to match
+exactly the plugin name as configured.
+
+Note, however, that this works for local hooks only. Remote hooks
+(like B<update> or B<pre-receive>) are run on the server. You can set
+up the server so that it defines the appropriate variable, but this
+isn't so useful as for the local hooks, as it's intended for
+once-in-a-while events.
 
 =head2 githooks.plugins DIR
 
