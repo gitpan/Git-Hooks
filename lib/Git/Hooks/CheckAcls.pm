@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckAcls;
 {
-  $Git::Hooks::CheckAcls::VERSION = '0.035';
+  $Git::Hooks::CheckAcls::VERSION = '0.036';
 }
 # ABSTRACT: Git::Hooks plugin for branch/tag access control.
 
@@ -89,8 +89,11 @@ sub check_ref {
         my ($who, $what, $refspec) = @$acl;
         next unless match_user($git, $who);
         next unless match_ref($ref, $refspec);
-        $what =~ /[^CRUD-]/ and die "$PKG: invalid acl 'what' component ($what).\n";
-        return if index($what, $op) != -1;
+        if ($what =~ /[^CRUD-]/) {
+            $git->error($PKG, "invalid acl 'what' component ($what).\n");
+            return 0;
+        }
+        return 1 if index($what, $op) != -1;
     }
 
     # Assign meaningful names to op codes.
@@ -101,22 +104,27 @@ sub check_ref {
         D => 'delete',
     );
 
-    my $myself = $git->authenticated_user();
+    if (my $myself = eval { $git->authenticated_user() }) {
+        $git->error($PKG, "you ($myself) cannot $op{$op} ref $ref.\n");
+    } else {
+        $git->error($PKG, "$@\n");
+    }
 
-    die "$PKG: you ($myself) cannot $op{$op} ref $ref.\n";
+    return 0;
 }
 
 # This routine can act both as an update or a pre-receive hook.
 sub check_affected_refs {
     my ($git) = @_;
 
-    return if im_admin($git);
+    return 1 if im_admin($git);
 
     foreach my $ref ($git->get_affected_refs()) {
-        check_ref($git, $ref);
+        check_ref($git, $ref)
+            or return 0;
     }
 
-    return;
+    return 1;
 }
 
 # Install hooks
@@ -135,7 +143,7 @@ Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
 
 =head1 VERSION
 
-version 0.035
+version 0.036
 
 =head1 DESCRIPTION
 

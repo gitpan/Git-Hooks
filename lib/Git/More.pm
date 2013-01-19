@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.035';
+  $Git::More::VERSION = '0.036';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -170,6 +170,12 @@ sub cache {
     return $git->{more}{cache}{$section};
 }
 
+sub clean_cache {
+    my ($git, $section) = @_;
+    delete $git->{more}{cache}{$section};
+    return;
+}
+
 sub get_commits {
     my ($git, $old_commit, $new_commit) = @_;
 
@@ -325,6 +331,12 @@ sub get_current_branch {
     return;
 }
 
+sub error {
+    my ($git, $prefix, $message) = @_;
+    warn "\n[$prefix] ", $message, "\n";
+    return 1;
+}
+
 
 1; # End of Git::More
 
@@ -338,7 +350,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.035
+version 0.036
 
 =head1 SYNOPSIS
 
@@ -471,6 +483,12 @@ plugin name) that is associated with a hash-ref. The method simply
 returns the hash-ref, which can be used by the caller to store any
 kind of information.
 
+=head2 clean_cache SECTION
+
+This method deletes the cache entry for SECTION. It may be used by
+hooks just before returning to B<Git::Hooks::run_hooks> in order to
+get rid of any value kept in the SECTION's cache.
+
 =head2 get_commits OLDCOMMIT NEWCOMMIT
 
 This method returns a list of hashes representing every commit
@@ -566,6 +584,15 @@ return this.
 This method returns the repository's current branch name, as indicated
 by the C<git branch> command. Note that it's a ref short name, i.e.,
 it's usually sub-intended to reside under the 'refs/heads/' ref scope.
+
+=head2 error PREFIX MESSAGE
+
+This method should be used by plugins to produce consistent error or
+warning messages. It gets two arguments: a PREFIX and the error
+MESSAGE. The PREFIX is usually the plugin's package name.
+
+The method simply produces the error message and returns. It doesn't
+die.
 
 =head1 SEE ALSO
 

@@ -17,7 +17,7 @@
 
 package Git::Hooks::GerritChangeId;
 {
-  $Git::Hooks::GerritChangeId::VERSION = '0.035';
+  $Git::Hooks::GerritChangeId::VERSION = '0.036';
 }
 # ABSTRACT: Git::Hooks plugin to insert a Change-Id in a commit message.
 
@@ -156,7 +156,10 @@ sub rewrite_message {
     my ($git, $commit_msg_file) = @_;
 
     my $msg = read_file($commit_msg_file);
-    defined $msg or die "$PKG: Can't open file '$commit_msg_file' for reading: $!\n";
+    unless (defined $msg) {
+        $git->error($PKG, "Can't open file '$commit_msg_file' for reading: $!\n");
+        return 0;
+    }
 
     my $new_msg = insert_change_id($git, $msg);
 
@@ -164,7 +167,7 @@ sub rewrite_message {
     write_file($commit_msg_file, $new_msg)
 	if defined $new_msg && $new_msg ne $msg;
 
-    return;
+    return 1;
 }
 
 # Install hooks
@@ -182,7 +185,7 @@ Git::Hooks::GerritChangeId - Git::Hooks plugin to insert a Change-Id in a commit
 
 =head1 VERSION
 
-version 0.035
+version 0.036
 
 =head1 DESCRIPTION
 

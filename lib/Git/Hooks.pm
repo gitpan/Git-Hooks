@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.035';
+  $Git::Hooks::VERSION = '0.036';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -88,14 +88,19 @@ sub spawn_external_file {
             die __PACKAGE__, ": can't exec: $!\n";
         }
     }
-    unless ($exit == 0) {
-        die __PACKAGE__, ": failed to execute '$file': $!\n"
-            if $exit == -1;
-        die sprintf("%s: '$file' died with signal %d, %s coredump",
-                    __PACKAGE__, ($exit & 127), ($exit & 128) ? 'with' : 'without'), "\n"
-            if $exit & 127;
-        die sprintf("%s: '$file' exited abnormally with value %d", __PACKAGE__, $exit >> 8), "\n";
+
+    if ($exit == 0) {
+        return 1;
+    } elsif ($exit == -1) {
+        $git->error(__PACKAGE__, ": failed to execute '$file': $!\n");
+    } elsif ($exit & 127) {
+        $git->error(__PACKAGE__, sprintf("'$file' died with signal %d, %s coredump\n",
+                                             ($exit & 127), ($exit & 128) ? 'with' : 'without'));
+    } else {
+        $git->error(__PACKAGE__, sprintf("'$file' exited abnormally with value %d\n", $exit >> 8));
     }
+
+    return 0;
 }
 
 sub grok_groups_spec {
@@ -231,6 +236,52 @@ my %prepare_hook = (
     'post-receive' => \&_prepare_receive,
 );
 
+sub _load_plugins {
+    my ($git) = @_;
+
+    my @enabled_plugins = $git->get_config(githooks => 'plugin');
+
+    return () unless @enabled_plugins; # no one configured
+
+    # Define the list of directories where we'll look for the hook
+    # plugins. First the local directory 'githooks' under the
+    # repository path, then the optional list of directories
+    # specified by the githooks.plugins config option, and,
+    # finally, the Git::Hooks standard hooks directory.
+    my @plugin_dirs = grep {-d} (
+        'githooks',
+        $git->get_config(githooks => 'plugins'),
+        catfile(dirname($INC{'Git/Hooks.pm'}), 'Hooks'),
+    );
+
+  HOOK:
+    foreach my $plugin (uniq @enabled_plugins) {
+        next if exists $ENV{$plugin} && ! $ENV{$plugin}; # disabled by user
+        my $exit = do {
+            if ($plugin =~ /::/) {
+                # It must be a module name
+                eval "require $plugin"; ## no critic (BuiltinFunctions::ProhibitStringyEval ErrorHandling::RequireCheckingReturnValueOfEval)
+            } else {
+                # Otherwise, it's a basename that we must look for
+                # in @plugin_dirs
+                $plugin .= '.pm' unless $plugin =~ /\.p[lm]$/i;
+                my @scripts = grep {-f} map {catfile($_, $plugin)} @plugin_dirs;
+                my $script = shift @scripts
+                    or die __PACKAGE__, ": can't find enabled hook $plugin.\n";
+                $plugin = $script; # for the error messages below
+                do $script;
+            }
+        };
+        unless ($exit) {
+            die __PACKAGE__, ": couldn't parse $plugin: $@\n" if $@;
+            die __PACKAGE__, ": couldn't do $plugin: $!\n"    unless defined $exit;
+            die __PACKAGE__, ": couldn't run $plugin\n";
+        }
+    }
+
+    return;
+}
+
 sub run_hook {
     my ($hook_name, @args) = @_;
 
@@ -243,48 +294,23 @@ sub run_hook {
         $prepare->($git, @args);
     }
 
-    # Invoke enabled plugins
-    if (my @enabled_plugins = $git->get_config(githooks => 'plugin')) {
-        # Define the list of directories where we'll look for the hook
-        # plugins. First the local directory 'githooks' under the
-        # repository path, then the optional list of directories
-        # specified by the githooks.plugins config option, and,
-        # finally, the Git::Hooks standard hooks directory.
-        my @plugin_dirs = grep {-d} (
-            'githooks',
-            $git->get_config(githooks => 'plugins'),
-            catfile(dirname($INC{'Git/Hooks.pm'}), 'Hooks'),
-        );
+    _load_plugins($git);
 
-      HOOK:
-        foreach my $plugin (uniq @enabled_plugins) {
-            next if exists $ENV{$plugin} && ! $ENV{$plugin}; # disabled by user
-            my $exit = do {
-                if ($plugin =~ /::/) {
-                    # It must be a module name
-                    eval "require $plugin"; ## no critic (BuiltinFunctions::ProhibitStringyEval ErrorHandling::RequireCheckingReturnValueOfEval)
-                } else {
-                    # Otherwise, it's a basename that we must look for
-                    # in @plugin_dirs
-                    $plugin .= '.pm' unless $plugin =~ /\.p[lm]$/i;
-                    my @scripts = grep {-f} map {catfile($_, $plugin)} @plugin_dirs;
-                    my $script = shift @scripts
-                        or die __PACKAGE__, ": can't find enabled hook $plugin.\n";
-                    $plugin = $script; # for the error messages below
-                    do $script;
-                }
-            };
-            unless ($exit) {
-                die __PACKAGE__, ": couldn't parse $plugin: $@\n" if $@;
-                die __PACKAGE__, ": couldn't do $plugin: $!\n"    unless defined $exit;
-                die __PACKAGE__, ": couldn't run $plugin\n";
-            }
-        }
-    }
+    my $errors = 0;
 
     # Call every hook function installed by the hook scripts before.
     foreach my $hook (values %{$Hooks{$hook_name}}) {
-        $hook->($git, @args);
+        my $ok = eval { $hook->($git, @args) };
+        if (defined $ok) {
+            # Modern hooks return a boolean value indicating their success.
+            $errors++ unless $ok;
+        } elsif (length $@) {
+            # Old hooks die when they fail...
+            $git->error(__PACKAGE__ . "($hook_name)", $@);
+            $errors++;
+        } else {
+            # ...and return undef when they succeed.
+        }
     }
 
     # Invoke enabled external hooks
@@ -293,12 +319,18 @@ sub run_hook {
             grep {-e} map {catfile($_, $hook_name)}
                 ($git->get_config(githooks => 'hooks'), catfile($git->repo_path(), 'hooks.d'))
         ) {
-            opendir my $dh, $dir or die __PACKAGE__, ": cannot opendir $dir: $!\n";
+            opendir my $dh, $dir
+                or $git->error(__PACKAGE__, ": cannot opendir $dir: $!\n")
+                    and $errors++
+                        and next;
             foreach my $file (grep {-f && -x} map {catfile($dir, $_)} readdir $dh) {
-                spawn_external_file($git, $file, $hook_name, @args);
+                spawn_external_file($git, $file, $hook_name, @args)
+                    or $errors++;
             }
         }
     }
+
+    die "\n" if $errors;
 
     return;
 }
@@ -316,7 +348,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.035
+version 0.036
 
 =head1 SYNOPSIS
 
@@ -474,8 +506,23 @@ a call to C<run_hook> passing to it the name with which it was called
 You may implement your own hooks using one of the hook I<directives>
 described in the HOOK DIRECTIVES section below. Your hooks may be
 implemented in the generic script you have created. They must be
-defined after the C<use Git::Hooks> line and before the C<run_hooks()>
-line. For example:
+defined after the C<use Git::Hooks> line and before the C<run_hook()>
+line.
+
+A hook should return a boolean value indicating if it was
+successful. B<run_hook> dies after invoking all hooks if at least one
+of them returned false.
+
+B<run_hook> invokes the hooks inside an eval block to catch any
+exception, such as if a B<die> is used inside them. When an exception
+is detected the hook is considered to have failed and the exception
+string (B<$@>) is showed to the user.
+
+The best way to produce an error message is to invoke the
+B<Git::More::error> method passing a prefix and a message for uniform
+formating.
+
+For example:
 
     # Check if every added/updated file is smaller than a fixed limit.
 
@@ -486,13 +533,18 @@ line. For example:
 
         my @changed = $git->command(qw/diff --cached --name-only --diff-filter=AM/);
 
+        my $errors = 0;
+
         foreach ($git->command('ls-files' => '-s', @changed)) {
             chomp;
             my ($mode, $sha, $n, $name) = split / /;
             my $size = $git->command('cat-file' => '-s', $sha);
             $size <= $LIMIT
-                or die "File '$name' has $size bytes, more than our limit of $LIMIT.\n";
+                or $git-error('CheckSize', "File '$name' has $size bytes, more than our limit of $LIMIT.\n"
+                    and $errors++;
         }
+
+        return $errors == 0;
     };
 
     # Check if every added/changed Perl file respects Perl::Critic's code
@@ -517,8 +569,11 @@ line. For example:
         if (%violations) {
             # FIXME: this is a lame way to format the output.
             require Data::Dumper;
-            die "Perl::Critic Violations:\n", Data::Dumper::Dumper(\%violations), "\n";
+            $git->error('Perl::Critic Violations', Data::Dumper::Dumper(\%violations));
+            return 0;
         }
+
+        return 1;
     };
 
 Note that you may define several hooks for the same operation. In the
@@ -527,7 +582,7 @@ be executed when Git invokes the generic script during the pre-commit
 phase.
 
 You may implement different kinds of hooks in the same generic
-script. The function C<run_hooks()> will activate just the ones for
+script. The function C<run_hook()> will activate just the ones for
 the current Git phase.
 
 =head2 Using Plugins
@@ -552,6 +607,13 @@ JIRA issues.
 =item * Git::Hooks::CheckLog
 
 Check commit log messages formatting.
+
+=item * Git::Hooks::CheckRewrite
+
+Check if a B<git rebase> or a B<git commit --amend> is safe, meaning
+that no rewritten commit is contained by any other branch besides the
+current one. This is useful, for instance, to prevent rebasing commits
+already pushed.
 
 =item * Git::Hooks::CheckStructure
 
@@ -609,8 +671,10 @@ directory, like this:
 
 Note that you may install more than one script under the same
 hook-named directory. The driver will execute all of them in a
-non-specified order. If any of them exits abnormally, the driver will
-exit with an appropriate error message.
+non-specified order.
+
+If any of them exits abnormally, B<run_hook> dies with an appropriate
+error message.
 
 =head1 CONFIGURATION
 

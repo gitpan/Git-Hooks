@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '0.035';
+  $Git::Hooks::CheckJira::VERSION = '0.036';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -75,40 +75,56 @@ sub grok_msg_jiras {
     }
 }
 
-my $JIRA;
+sub _jira {
+    my ($git) = @_;
+
+    my $cache = $git->cache($PKG);
+
+    # Connect to JIRA if not yet connected
+    unless (exists $cache->{jira}) {
+        my %jira;
+        for my $option (qw/jiraurl jirauser jirapass/) {
+            $jira{$option} = $git->get_config($CFG => $option)
+                or $git->error($PKG, "Missing $CFG.$option configuration attribute.\n")
+                    and return;
+        }
+        $jira{jiraurl} =~ s:/+$::; # trim trailing slashes from the URL
+
+        my $jira = eval { JIRA::Client->new($jira{jiraurl}, $jira{jirauser}, $jira{jirapass}) };
+        length $@
+            and $git->error($PKG, "cannot connect to the JIRA server at '$jira{jiraurl}' as '$jira{jirauser}': $@\n")
+                and return;
+        $cache->{jira} = $jira;
+    }
+
+    return $cache->{jira};
+}
+
+# Returns a JIRA::Client object or undef if there is any problem
 
 sub get_issue {
     my ($git, $key) = @_;
 
-    # Connect to JIRA if not yet connected
-    unless (defined $JIRA) {
-        my %jira;
-        for my $option (qw/jiraurl jirauser jirapass/) {
-            $jira{$option} = $git->get_config($CFG => $option)
-                or die "$PKG: Missing $CFG.$option configuration attribute.\n";
-        }
-        $jira{jiraurl} =~ s:/+$::; # trim trailing slashes from the URL
-        $JIRA = eval {JIRA::Client->new($jira{jiraurl}, $jira{jirauser}, $jira{jirapass})};
-        die "$PKG: cannot connect to the JIRA server at '$jira{jiraurl}' as '$jira{jirauser}': $@\n"
-            if $@;
-    }
+    my $jira = _jira($git);
 
     my $cache = $git->cache($PKG);
 
     # Try to get the issue from the cache
-    unless (exists $cache->{$key}) {
-        $cache->{$key} = eval {$JIRA->getIssue($key)};
-        die "$PKG: cannot get issue $key: $@\n" if $@;
+    unless (exists $cache->{keys}{$key}) {
+        $cache->{keys}{$key} = eval { $cache->{jira}->getIssue($key) };
+        length $@
+            and $git->error($PKG, "cannot get issue $key: $@\n")
+                and return;
     }
 
-    return $cache->{$key};
+    return $cache->{keys}{$key};
 }
 
 sub ferror {
     my ($key, $commit, $ref, $error) = @_;
-    my $msg = "$PKG: issue $key, $error.\n  (cited ";
+    my $msg = "issue $key, $error.\n  (cited ";
     $msg .= "by $commit->{commit} " if $commit->{commit};
-    $msg .= "in $ref)";
+    $msg .= "in $ref)\n";
     return $msg;
 }
 
@@ -117,25 +133,85 @@ sub check_codes {
 
     my @codes;
 
+  CODE:
     foreach my $check ($git->get_config($CFG => 'check-code')) {
         my $code;
         if ($check =~ s/^file://) {
             $code = do $check;
             unless ($code) {
-                die "$PKG: couldn't parse option check-code ($check): $@\n" if $@;
-                die "$PKG: couldn't do option check-code ($check): $!\n"    unless defined $code;
-                die "$PKG: couldn't run option check-code ($check)\n"       unless $code;
+                if (length $@) {
+                    $git->error($PKG, "couldn't parse option check-code ($check): $@\n");
+                } elsif (! defined $code) {
+                    $git->error($PKG, "couldn't do option check-code ($check): $!\n");
+                } else {
+                    $git->error($PKG, "couldn't run option check-code ($check)\n");
+                }
+                next CODE;
             }
         } else {
             $code = eval $check; ## no critic (BuiltinFunctions::ProhibitStringyEval)
-            die "$PKG: couldn't parse option check-code value:\n$@\n" if $@;
+            length $@
+                and $git->error($PKG, "couldn't parse option check-code value:\n$@\n")
+                    and next CODE;
         }
         is_code_ref($code)
-            or die "$PKG: option check-code must end with a code ref.\n";
+            or $git->error($PKG, "option check-code must end with a code ref.\n")
+                and next CODE;
         push @codes, $code;
     }
 
     return @codes;
+}
+
+sub _check_jira_keys {
+    my ($git, $commit, $ref, @keys) = @_;
+
+    my @issues;
+
+    my $unresolved  = $git->get_config($CFG => 'unresolved');
+    my $by_assignee = $git->get_config($CFG => 'by-assignee');
+
+    my $errors = 0;
+
+  KEY:
+    foreach my $key (@keys) {
+        my $issue = get_issue($git, $key)
+            or $errors++
+                and next KEY;
+
+        if ($unresolved && defined $issue->{resolution}) {
+            $git->error($PKG, ferror($key, $commit, $ref, "is already resolved"));
+            $errors++;
+            next KEY;
+        }
+
+        if ($by_assignee) {
+            my $user = $git->authenticated_user()
+                or $git->error($PKG, ferror($key, $commit, $ref, "cannot grok the authenticated user"))
+                    and $errors++
+                        and next KEY;
+
+            $user eq $issue->{assignee}
+                or $git->error($PKG, ferror($key, $commit, $ref,
+                                            "is currently assigned to '$issue->{assignee}' but should be assigned to you ($user)"))
+                    and $errors++
+                        and next KEY;
+        }
+
+        push @issues, $issue;
+    }
+
+    foreach my $code (check_codes($git)) {
+        my $ok = eval { $code->($git, $commit, _jira($git), @issues) };
+        if (defined $ok) {
+            $errors++ unless $ok;
+        } elsif (length $@) {
+            $git->error($PKG, "Error while evaluating check-code: $@\n");
+            $errors++;
+        }
+    }
+
+    return $errors == 0;
 }
 
 sub check_commit_msg {
@@ -155,53 +231,22 @@ sub check_commit_msg {
         if ($git->get_config($CFG => 'require')) {
             my $shortid = substr $commit->{commit}, 0, 8;
             if (@keys == $nkeys) {
-                die <<"EOF";
-$PKG: commit $shortid (in $ref) does not cite any JIRA in the message:
-$commit->{body}
-EOF
+                $git->error($PKG, "commit $shortid (in $ref) does not cite any JIRA in its message.\n");
+                return 0;
             } else {
                 my $project = join(' ', $git->get_config($CFG => 'project'));
-                die <<"EOF";
-$PKG: commit $shortid (in $ref) does not cite any JIRA from the expected
-$PKG: projects ($project) in the message:
-$commit->{body}
+                $git->error($PKG, <<"EOF");
+commit $shortid (in $ref) does not cite any JIRA from the expected
+projects ($project) in its message.
 EOF
+                return 0;
             }
         } else {
-            return;
+            return 1;
         }
     }
 
-    my @issues;
-
-    my $unresolved  = $git->get_config($CFG => 'unresolved');
-    my $by_assignee = $git->get_config($CFG => 'by-assignee');
-
-    foreach my $key (@keys) {
-        my $issue = get_issue($git, $key);
-
-        if ($unresolved && defined $issue->{resolution}) {
-            die ferror($key, $commit, $ref, "is already resolved"), "\n";
-        }
-
-        if ($by_assignee) {
-            my $user = $git->authenticated_user()
-                or die ferror($key, $commit, $ref,
-                              "cannot grok the authenticated user"), "\n";
-
-            $user eq $issue->{assignee}
-                or die ferror($key, $commit, $ref,
-                              "is currently assigned to '$issue->{assignee}' but should be assigned to you ($user)"), "\n";
-        }
-
-        push @issues, $issue;
-    }
-
-    foreach my $code (check_codes($git)) {
-        $code->($git, $commit, $JIRA, @issues);
-    }
-
-    return;
+    return _check_jira_keys($git, $commit, $ref, @keys);
 }
 
 sub check_message_file {
@@ -210,33 +255,38 @@ sub check_message_file {
     _setup_config($git);
 
     my $current_branch = 'refs/heads/' . $git->get_current_branch();
-    return unless is_ref_enabled($current_branch, $git->get_config($CFG => 'ref'));
+    return 1 unless is_ref_enabled($current_branch, $git->get_config($CFG => 'ref'));
 
     my $msg = read_file($commit_msg_file)
-        or die "$PKG: Can't open file '$commit_msg_file' for reading: $!\n";
+        or $git->error($PKG, "Can't open file '$commit_msg_file' for reading: $!\n")
+            and return 0;
 
     # Remove comment lines from the message file contents.
     $msg =~ s/^#[^\n]*\n//mgs;
 
-    check_commit_msg(
+    return check_commit_msg(
         $git,
         { commit => '', body => $msg }, # fake a commit hash to simplify check_commit_msg
         $current_branch,
     );
-
-    return;
 }
 
 sub check_ref {
     my ($git, $ref) = @_;
 
-    return unless is_ref_enabled($ref, $git->get_config($CFG => 'ref'));
+    return 1 unless is_ref_enabled($ref, $git->get_config($CFG => 'ref'));
+
+    my $errors = 0;
 
     foreach my $commit ($git->get_affected_ref_commits($ref)) {
-        check_commit_msg($git, $commit, $ref);
+        check_commit_msg($git, $commit, $ref)
+            or $errors++;
     }
 
-    return;
+    # Disconnect from JIRA
+    $git->clean_cache($PKG);
+
+    return $errors == 0;
 }
 
 # This routine can act both as an update or a pre-receive hook.
@@ -245,13 +295,19 @@ sub check_affected_refs {
 
     _setup_config($git);
 
-    return if im_admin($git);
+    return 1 if im_admin($git);
+
+    my $errors = 0;
 
     foreach my $ref ($git->get_affected_refs()) {
-        check_ref($git, $ref);
+        check_ref($git, $ref)
+            or $errors++;
     }
 
-    return;
+    # Disconnect from JIRA
+    $git->clean_cache($PKG);
+
+    return $errors == 0;
 }
 
 # Install hooks
@@ -271,7 +327,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 0.035
+version 0.036
 
 =head1 DESCRIPTION
 
@@ -442,8 +498,13 @@ issues being cited by the commit's message.
 
 =back
 
-The subroutine must simply return with no value to indicate success
-and must die to indicate failure.
+The subroutine should return a boolean value indicating success. Any
+errors should be produced by invoking the B<Git::More::error> method.
+
+If the subroutine returns undef it's considered to have succeeded.
+
+If it raises an exception (e.g., by invoking B<die>) it's considered
+to have failed and a proper message is produced to the user.
 
 =head1 EXPORTS
 
