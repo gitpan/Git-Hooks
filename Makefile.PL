@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use File::Spec::Functions;
+use File::Slurp;
 
 use 5.010;
 
@@ -11,7 +12,7 @@ if ($^O eq 'MSWin32') {
 
 sub git {
     my ($args) = @_;
-    my $output = eval "`git $args`";
+    my $output = `git $args`;
     if ($? == -1) {
         warn "Failed to execute 'git $args': $!\n";
         exit 0;
@@ -36,18 +37,20 @@ if (my ($major, $minor) = ($git_version =~ /(\d+)\.(\d+)/)) {
 
 # Check if we can use Git.pm
 # See http://git.661346.n2.nabble.com/better-way-to-find-Git-pm-officially-td7416362.html
-{
-    local @INC = @INC;
-    unshift @INC, split(/:/, $ENV{GITPERLLIB}) if exists $ENV{GITPERLLIB};
-    unless (eval {require Git}) {
-        local $, = ' ';
-        warn <<"EOF";
+my $pathsep = $^O eq 'MSWin32' ? ';' : ':';
+unshift @INC, split("$pathsep", $ENV{GITPERLLIB}) if exists $ENV{GITPERLLIB};
+my $INC = join ' ', @INC;
+my $require = eval {require Git};
+shift @INC if exists $ENV{GITPERLLIB};
 
-I can't find Git.pm in your \@INC: ( @INC ).
+unless (defined $require) {
+    warn <<"EOF";
 
-The Git.pm module is distributed with git and is not at CPAN yet. So,
+I can't find Git.pm in your \@INC: ( $INC ).
+
+The Git module is distributed with git and is not at CPAN yet. So,
 Git::Hooks can't depend on it directly. Since I already detected that
-you have git you most probably have it installed somewhere.
+you have git you most probably have Git installed somewhere.
 
 Once you find Git.pm, you have to make it available to your Perl in
 order to install Git::Hooks and to use it. Here are a few options to
@@ -66,33 +69,49 @@ do that:
 
 EOF
 
-        # Try to grok it from a git perl script.
-        chomp(my $exec_path = git('--exec-path'));
-        my $gitsvn = catfile($exec_path, 'git-svn');
-        if (open my $fh, '<', $gitsvn) {
-            my $line;
-            $line = <$fh> for 1..2; # read the second line
-            if ($line =~ m:^use lib .*? \|\| "([^"]+)":) {
-                my $git_pm = catfile($1, 'Git.pm');
-                if (-f $git_pm) {
-                    warn "Look, I noticed that you have it at $git_pm.\n\n"
-                }
-                exit 0;
-            }
-        }
+    my @inc;                    # other places to find it
 
-        # Try to find it on usual places
-        if (-f '/usr/share/perl5/Git.pm') {
+    # Try to grok it from a git perl script.
+    chomp(my $exec_path = git('--exec-path'));
+    my $gitsvn = catfile($exec_path, 'git-svn');
+    if (open my $fh, '<', $gitsvn) {
+        my $line;
+        $line = <$fh> for 1..2; # read the second line
+        if ($line =~ m:^use lib .*? \|\| "([^"]+)":) {
+            push @inc, $1;
+        }
+    }
+
+    # Usual places for some OSs
+    if ($^O eq 'linux') {
+        push @inc, '/usr/share/perl5';
+    } elsif ($^O eq 'MSWin32') {
+        my $pfiles = exists $ENV{'ProgramFiles(x86)'} ? $ENV{'ProgramFiles(x86)'} : 'C:\Program Files (x86)';
+        push @inc, "$pfiles\\Git\\lib\\perl5\\site_perl";
+    }
+
+    my $found;
+
+    foreach my $inc (@inc) {
+        my $git_pm = catfile($inc, 'Git.pm');
+        if (-r $git_pm) {
+            write_file(catfile(qw/t GITPERLLIB/), $inc);
             warn <<"EOF";
-Look, I noticed that you have it at /usr/share/perl5/Git.pm. This is
-the usual place for it in Debian derived Linux distributions.
+Hey, you're lucky. I just found it at:
+
+    $git_pm
+
+I'm going to use this during the tests and allow you to install
+Git::Hooks. But you'll still have to make Git available to your own
+scripts following the instructions above.
 
 EOF
-            exit 0;
+            $found = 1;
+            last;
         }
-
-        exit 0;
     }
+
+    exit 0 unless $found;
 }
 
 use ExtUtils::MakeMaker 6.30;
@@ -104,6 +123,7 @@ my %WriteMakefileArgs = (
   'AUTHOR' => 'Gustavo L. de M. Chaves <gnustavo@cpan.org>',
   'BUILD_REQUIRES' => {
     'Config' => '0',
+    'Cwd' => '0',
     'File::Path' => '2.08',
     'File::Remove' => '0',
     'File::pushd' => '0',
@@ -133,7 +153,7 @@ my %WriteMakefileArgs = (
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.036',
+  'VERSION' => '0.037',
   'test' => {
     'TESTS' => 't/*.t'
   },

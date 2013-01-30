@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.036';
+  $Git::More::VERSION = '0.037';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -12,8 +12,9 @@ BEGIN {
     local @INC = @INC;
     unshift @INC, split(/:/, $ENV{GITPERLLIB}) if exists $ENV{GITPERLLIB};
     require Git;
-    use parent -norequire, 'Git';
 }
+
+use parent -norequire, 'Git';
 
 use Error qw(:try);
 use Carp;
@@ -117,12 +118,15 @@ sub get_config {
 
     unless (exists $git->{more}{config}) {
         my %config;
-        my ($fh, $ctx) = $git->command_output_pipe(config => '--null', '--list');
-        {
-            local $/ = "\x0";
-            while (<$fh>) {
-                chop;           # final \x0
-                my ($option, $value) = split /\n/, $_, 2;
+
+        my $config = do {
+           local $/ = "\c@";
+           $git->command(config => '--null', '--list');
+        };
+
+        if (defined $config) {
+            while ($config =~ /([^\cJ]+)\cJ([^\c@]*)\c@/sg) {
+                my ($option, $value) = ($1, $2);
                 if ($option =~ /(.+)\.(.+)/) {
                     push @{$config{lc $1}{lc $2}}, $value;
                 } else {
@@ -130,11 +134,6 @@ sub get_config {
                 }
             }
         }
-        try {
-            $git->command_close_pipe($fh, $ctx);
-        } otherwise {
-            # No config option found. That's ok.
-        };
 
         # Set default values for undefined ones.
         $config{githooks}{externals} //= [1];
@@ -181,22 +180,22 @@ sub get_commits {
 
     my @commits;
 
+    local $/ = "\c@\cJ";
     my ($pipe, $ctx) = $git->command_output_pipe(
         'rev-list',
         # See 'git help rev-list' to understand the --pretty argument
         '--pretty=format:%H%n%T%n%P%n%aN%n%aE%n%ai%n%cN%n%cE%n%ci%n%s%n%n%b%x00',
         "$old_commit..$new_commit");
-    {
-        local $/ = "\x00\n";
-        while (<$pipe>) {
+
+    while (<$pipe>) {
             my %commit;
             @commit{qw/header commit tree parent
                        author_name author_email author_date
                        commmitter_name committer_email committer_date
-                       body/} = split /\n/, $_, 11;
+                       body/} = split "\cJ", $_, 11;
             push @commits, \%commit;
-        }
     }
+
     $git->command_close_pipe($pipe, $ctx);
 
     return @commits;
@@ -350,7 +349,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.036
+version 0.037
 
 =head1 SYNOPSIS
 

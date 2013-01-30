@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.036';
+  $Git::Hooks::VERSION = '0.037';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -218,7 +218,7 @@ sub _prepare_receive {
     my ($git) = @_;
     # pre-receive and post-receive get the list of affected
     # commits via STDIN.
-    while (<>) {
+    while (<STDIN>) { ## no critic (InputOutput::ProhibitExplicitStdin)
         chomp;
         my ($old_commit, $new_commit, $ref) = split;
         $git->set_affected_ref($ref, $old_commit, $new_commit);
@@ -313,8 +313,8 @@ sub run_hook {
         }
     }
 
-    # Invoke enabled external hooks
-    if ($git->get_config(githooks => 'externals')) {
+    # Invoke enabled external hooks. This doesn't work in Windows yet.
+    if ($^O ne 'MSWin32' && $git->get_config(githooks => 'externals')) {
         foreach my $dir (
             grep {-e} map {catfile($_, $hook_name)}
                 ($git->get_config(githooks => 'hooks'), catfile($git->repo_path(), 'hooks.d'))
@@ -348,7 +348,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.036
+version 0.037
 
 =head1 SYNOPSIS
 

@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckRewrite;
 {
-  $Git::Hooks::CheckRewrite::VERSION = '0.036';
+  $Git::Hooks::CheckRewrite::VERSION = '0.037';
 }
 # ABSTRACT: Git::Hooks plugin for checking against unsafe rewrites
 
@@ -101,18 +101,17 @@ sub check_commit_amend {
     if (@branches > 0) {
         # $old_commit is reachable by at least one branch, which means
         # the amend was unsafe.
-        local $, = "  \n";
+        my $branches = join "\n    ", @branches;
         $git->error($PKG, <<"EOF");
 
 You've just performed un unsafe commit --amend because your original
 HEAD ($old_commit) is still reachable by the following branch(es):
 
-    @branches
+    $branches
 
 You can revert the amend with the following command:
 
     git reset --soft $old_commit
-
 EOF
         return 0;
     }
@@ -147,14 +146,12 @@ sub check_rebase {
     if (@branches > 1) {
         # The base commit is reachable by more than one branch, which
         # means the rewrite is unsafe.
-        @branches = grep {$_ ne $branch} @branches;
-        local $, = "  \n";
+        my $branches = join("\n    ", grep {$_ ne $branch} @branches);
         $git->error($PKG, <<"EOF");
 This is an unsafe rebase because it would rewrite commits shared by
 $branch and the following other branch(es):
 
-    @branches
-
+    $branches
 EOF
         return 0;
     }
@@ -179,7 +176,7 @@ Git::Hooks::CheckRewrite - Git::Hooks plugin for checking against unsafe rewrite
 
 =head1 VERSION
 
-version 0.036
+version 0.037
 
 =head1 DESCRIPTION
 
