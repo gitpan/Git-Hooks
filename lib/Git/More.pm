@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.037';
+  $Git::More::VERSION = '0.038';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -349,7 +349,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.037
+version 0.038
 
 =head1 SYNOPSIS
 

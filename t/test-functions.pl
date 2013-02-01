@@ -52,19 +52,6 @@ sub newdir {
     $dir;
 }
 
-sub debug_test {
-    my ($git, $debug) = @_;
-    $debug //= 1;
-    my $hook_pl = catfile($git->repo_path(), 'hooks', 'hook.pl');
-    my $pl = read_file($hook_pl);
-    if (
-	   ! $debug && $pl =~ s/^([^\n]+) -d\n/$1\n/s
-	||   $debug && $pl =~ s/^([^\n]+)(?!-d)\n/$1 -d\n/s
-    ) {
-	write_file($hook_pl, $pl);
-    }
-}
-
 sub install_hooks {
     my ($git, $extra_perl, @hooks) = @_;
     my $hooks_dir = catfile($git->repo_path(), 'hooks');
@@ -131,10 +118,12 @@ EOF
             (my $perl = $^X) =~ tr:\\:/:;
             $hook_pl =~ tr:\\:/:;
             my $d = $ENV{DBG} ? '-d' : '';
-            write_file($hookfile, <<"EOF");
+            my $script = <<"EOF";
 #!/bin/sh
 $perl $d $hook_pl $hook \"\$@\"
 EOF
+            write_file($hookfile, {err_mode => 'carp'}, $script)
+                or BAIL_OUT("can't write_file('$hookfile', '$script')\n");
 	    chmod 0755 => $hookfile;
 	} else {
             symlink 'hook.pl', $hookfile
@@ -186,14 +175,7 @@ sub new_repos {
 	return ($repo, $filename, $clone, $T);
     } otherwise {
         local $, = ':';
-	BAIL_OUT(<<"EOF");
-Error setting up repos for test:
-* Exception: $_[0]
-* CWD: $T
-* git-version: $git_version
-* \@INC: @INC
-
-EOF
+	BAIL_OUT("Error setting up repos for test: Exception=$_[0]; CWD=$T; git-version=$git_version; \@INC=(@INC).\n");
     };
 }
 

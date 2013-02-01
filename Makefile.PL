@@ -131,7 +131,11 @@ my %WriteMakefileArgs = (
     'URI::file' => '0'
   },
   'CONFIGURE_REQUIRES' => {
-    'ExtUtils::MakeMaker' => '6.30'
+    'ExtUtils::MakeMaker' => '6.30',
+    'File::Slurp' => '0',
+    'File::Spec::Functions' => '0',
+    'strict' => '0',
+    'warnings' => '0'
   },
   'DISTNAME' => 'Git-Hooks',
   'LICENSE' => 'perl',
@@ -153,7 +157,7 @@ my %WriteMakefileArgs = (
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.037',
+  'VERSION' => '0.038',
   'test' => {
     'TESTS' => 't/*.t'
   },
