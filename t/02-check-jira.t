@@ -4,7 +4,7 @@ use 5.010;
 use strict;
 use warnings;
 use lib 't';
-use Test::More tests => 18;
+use Test::More tests => 20;
 use File::Slurp;
 
 BEGIN { require "test-functions.pl" };
@@ -177,4 +177,13 @@ check_cannot_push('deny push by pre-receive by default without JIRAs',
 setup_repos_for(\$clone, 'pre-receive');
 
 check_can_push('allow push by pre-receive if valid issue cited [GIT-2]');
+
+
+# Check commits in new branch
+$repo->command(checkout => '-q', '-b', 'fix');
+check_can_push('allow push in new branch [GIT-2]', 'fix');
+
+$repo->command(checkout => '-q', 'master');
+$repo->command(branch => '-D', 'fix');
+check_can_push('allow push to delete a branch [GIT-2]', ':fix');
 

@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.038';
+  $Git::More::VERSION = '0.039';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -178,6 +178,39 @@ sub clean_cache {
 sub get_commits {
     my ($git, $old_commit, $new_commit) = @_;
 
+    # We're interested in all commits reachable from $new_commit but
+    # not reachable from $old_commit. We're going to use the "git
+    # rev-list" command for that. As you can read on its
+    # documentation, the usual syntax to specify this set of commits
+    # is this: "$new_commit ^$old_commit".
+
+    # However, there are two special cases: when a new branch is
+    # created and when an old branch is deleted.
+
+    # When an old branch is deleted $new_commit is null (i.e.,
+    # '0'x40'). In this case previous commits are being forgotten and
+    # the hooks usually don't need to check them. So, in this
+    # situation we simply return an empty list of commits.
+
+    return () if $new_commit eq '0' x 40;
+
+    # When a new branch is created $old_commit is null (i.e.,
+    # '0'x40). In this case we want all commits reachable from
+    # $new_commit but not reachable from any other branch. The syntax
+    # for this is "$new_commit ^$b1 ^$b2 ... ^$bn", i.e., $new_commit
+    # followed by every other branch name prefixed by carets. We can
+    # get at their names using the technique described in, e.g.,
+    # http://stackoverflow.com/questions/3511057/git-receive-update-hooks-and-new-branches.
+
+    # The @excludes variable will hold the list of commits that will
+    # be prefixed with carets in the git rev-list command invokation.
+
+    my @excludes =
+        $old_commit eq '0' x 40
+        ? grep {$_ ne $new_commit} $git->command(qw:for-each-ref --format=%(objectname) refs/heads/:)
+        : $old_commit;
+
+    # The commit list to be returned
     my @commits;
 
     local $/ = "\c@\cJ";
@@ -185,7 +218,9 @@ sub get_commits {
         'rev-list',
         # See 'git help rev-list' to understand the --pretty argument
         '--pretty=format:%H%n%T%n%P%n%aN%n%aE%n%ai%n%cN%n%cE%n%ci%n%s%n%n%b%x00',
-        "$old_commit..$new_commit");
+        $new_commit,
+        map {"^$_"} @excludes,
+    );
 
     while (<$pipe>) {
             my %commit;
@@ -324,16 +359,30 @@ sub authenticated_user {
 
 sub get_current_branch {
     my ($git) = @_;
-    foreach ($git->command(branch => '--no-color')) {
-        return $1 if /^\* (.*)/;
-    }
-    return;
+    my $branch;
+    try {
+        $branch = $git->command_oneline(qw/symbolic-ref HEAD/);
+    } otherwise {
+        # In dettached head state
+    };
+    return $branch;
 }
 
 sub error {
     my ($git, $prefix, $message) = @_;
-    warn "\n[$prefix] ", $message, "\n";
+    my $fmtmsg = "\n[$prefix] $message";
+    push @{$git->{more}{errors}}, "$fmtmsg\n";
+    warn "$fmtmsg\n";
     return 1;
+}
+
+sub get_errors {
+    my ($git) = @_;
+    if (exists $git->{more}{errors}) {
+        return @{$git->{more}{errors}};
+    } else {
+        return ();
+    }
 }
 
 
@@ -349,7 +398,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.038
+version 0.039
 
 =head1 SYNOPSIS
 
@@ -492,10 +541,26 @@ get rid of any value kept in the SECTION's cache.
 
 This method returns a list of hashes representing every commit
 reachable from NEWCOMMIT but not from OLDCOMMIT. It obtains this
-information by invoking C<git rev-list OLDCOMIT..NEWCOMMIT>.
+information by invoking C<git rev-list NEWCOMMIT ^OLDCOMMIT>.
 
-Each commit is represented by a hash with the following structure (the
-codes are explained in the C<git help rev-list> document):
+There are two special cases, though:
+
+If NEWCOMMIT is the null SHA-1, i.e.,
+'0000000000000000000000000000000000000000', this means that a branch,
+pointing to OLDCOMMIT, has been removed. In this case the method
+returns an empty list, meaning that no new commit has been created.
+
+If OLDCOMMIT is the null SHA-1, this means that a new branch poiting
+to NEWCOMMIT is being created. In this case we want all commits
+reachable from NEWCOMMIT but not reachable from any other branch. The
+syntax for this is NEWCOMMIT ^B1 ^B2 ... ^Bn", i.e., NEWCOMMIT
+followed by every other branch name prefixed by carets. We can get at
+their names using the technique described in, e.g., L<this
+discussion|http://stackoverflow.com/questions/3511057/git-receive-update-hooks-and-new-branches>.
+
+Each commit in the returned list is represented by a hash with the
+following structure (the codes are explained in the C<git help
+rev-list> document):
 
     {
         commit          => %H:  commit hash
@@ -581,17 +646,24 @@ return this.
 =head2 get_current_branch
 
 This method returns the repository's current branch name, as indicated
-by the C<git branch> command. Note that it's a ref short name, i.e.,
-it's usually sub-intended to reside under the 'refs/heads/' ref scope.
+by the C<git symbolic-ref HEAD> command.
+
+If the repository is in a dettached head state, i.e., if HEAD points
+to a commit instead of to a branch, the method returns undef.
 
 =head2 error PREFIX MESSAGE
 
-This method should be used by plugins to produce consistent error or
+This method should be used by plugins to record consistent error or
 warning messages. It gets two arguments: a PREFIX and the error
 MESSAGE. The PREFIX is usually the plugin's package name.
 
-The method simply produces the error message and returns. It doesn't
+The method simply records the error message and returns. It doesn't
 die.
+
+=head2 get_errors
+
+This method returns the list of error messages recorded so far by the
+C<error> method.
 
 =head1 SEE ALSO
 

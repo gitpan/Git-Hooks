@@ -17,7 +17,7 @@
 
 package Git::Hooks::GerritChangeId;
 {
-  $Git::Hooks::GerritChangeId::VERSION = '0.038';
+  $Git::Hooks::GerritChangeId::VERSION = '0.039';
 }
 # ABSTRACT: Git::Hooks plugin to insert a Change-Id in a commit message.
 
@@ -185,7 +185,7 @@ Git::Hooks::GerritChangeId - Git::Hooks plugin to insert a Change-Id in a commit
 
 =head1 VERSION
 
-version 0.038
+version 0.039
 
 =head1 DESCRIPTION
 
@@ -258,11 +258,13 @@ message.
 
 =head1 REFERENCES
 
-Gerrit's Home Page: L<http://gerrit.googlecode.com/>
+L<Gerrit's Home Page|http://gerrit.googlecode.com/>.
 
-Gerrit's official commit-msg hook: L<https://gerrit.googlesource.com/gerrit/+/master/gerrit-server/src/main/resources/com/google/gerrit/server/tools/root/hooks/commit-msg>
+L<Gerrit's official commit-msg
+hook|https://gerrit.googlesource.com/gerrit/+/master/gerrit-server/src/main/resources/com/google/gerrit/server/tools/root/hooks/commit-msg>.
 
-Gerrit's official hook documentation: L<https://gerrit.googlesource.com/gerrit/+/master/Documentation/cmd-hook-commit-msg.txt>
+L<Gerrit's official hook
+documentation|https://gerrit.googlesource.com/gerrit/+/master/Documentation/cmd-hook-commit-msg.txt>.
 
 =head1 AUTHOR
 

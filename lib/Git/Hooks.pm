@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.038';
+  $Git::Hooks::VERSION = '0.039';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -9,6 +9,7 @@ use strict;
 use warnings;
 use Exporter qw/import/;
 use Data::Util qw(:all);
+use File::Slurp;
 use File::Basename;
 use File::Spec::Functions;
 use List::MoreUtils qw/uniq/;
@@ -49,7 +50,7 @@ use Git::More;
 sub is_ref_enabled {
     my ($ref, @specs) = @_;
 
-    return 1 unless @specs;
+    return 1 if ! defined $ref || @specs == 0;
 
     foreach (@specs) {
         if (/^\^/) {
@@ -68,11 +69,27 @@ sub is_ref_enabled {
 sub spawn_external_file {
     my ($git, $file, $hook, @args) = @_;
 
-    my $exit;
     if ($hook !~ /^(?:pre|post)-receive$/) {
-        $exit = system {$file} ($hook, @args);
+
+        my $exit = system {$file} ($hook, @args);
+
+        if ($exit == 0) {
+            return 1;
+        } elsif ($exit == -1) {
+            $git->error(__PACKAGE__, ": failed to execute '$file': $!\n");
+        } elsif ($exit & 127) {
+            $git->error(__PACKAGE__, sprintf("'$file' died with signal %d, %s coredump\n",
+                                             ($exit & 127), ($exit & 128) ? 'with' : 'without'));
+        } else {
+            $git->error(__PACKAGE__, sprintf("'$file' exited abnormally with value %d\n", $exit >> 8));
+        }
+
+        return 0;
+
     } else {
-        my $pid = open my $pipe, '|-';
+
+        my $pid = open my $pipe, '|-'; ## no critic (InputOutput::RequireBriefOpen)
+
         if (! defined $pid) {
             die __PACKAGE__, ": can't fork: $!\n";
         } elsif ($pid) {
@@ -81,26 +98,19 @@ sub spawn_external_file {
                 my ($old, $new) = $git->get_affected_ref_range($ref);
                 say $pipe "$old $new $ref";
             }
-            $exit = close $pipe;
+            if (close $pipe) {
+                return 1;
+            } elsif ($!) {
+                die __PACKAGE__, ": Error closing pipe to external hook '$file': $!\n";
+            } else {
+                die __PACKAGE__, ": External hook '$file' exited with $?\n";
+            }
         } else {
             # child
             exec {$file} ($hook, @args);
             die __PACKAGE__, ": can't exec: $!\n";
         }
     }
-
-    if ($exit == 0) {
-        return 1;
-    } elsif ($exit == -1) {
-        $git->error(__PACKAGE__, ": failed to execute '$file': $!\n");
-    } elsif ($exit & 127) {
-        $git->error(__PACKAGE__, sprintf("'$file' died with signal %d, %s coredump\n",
-                                             ($exit & 127), ($exit & 128) ? 'with' : 'without'));
-    } else {
-        $git->error(__PACKAGE__, sprintf("'$file' exited abnormally with value %d\n", $exit >> 8));
-    }
-
-    return 0;
 }
 
 sub grok_groups_spec {
@@ -214,10 +224,16 @@ sub eval_gitconfig {
     return $value;
 }
 
+##############
+# The following routines prepare the arguments for some hooks to make
+# it easier to deal with them later on.
+
+# The pre-receive and post-receive hooks get the list of affected
+# commits via STDIN. This routine gets them all and set all affected
+# refs in the Git object.
+
 sub _prepare_receive {
     my ($git) = @_;
-    # pre-receive and post-receive get the list of affected
-    # commits via STDIN.
     while (<STDIN>) { ## no critic (InputOutput::ProhibitExplicitStdin)
         chomp;
         my ($old_commit, $new_commit, $ref) = split;
@@ -226,15 +242,28 @@ sub _prepare_receive {
     return;
 }
 
+# The update hook get three arguments telling which reference is being
+# updated, from which commit, to which commit. Here we use these
+# arguments to set the affected ref in the Git object.
+
+sub _prepare_update {
+    my ($git, $args) = @_;
+    $git->set_affected_ref(@$args);
+    return;
+}
+
+# The %prepare_hook hash maps hook names to the routine that must be
+# invoked in order to "prepare" their arguments.
+
 my %prepare_hook = (
-    update => sub {
-        my ($git, $ref, $old_commit, $new_commit) = @_;
-        $git->set_affected_ref($ref, $old_commit, $new_commit);
-        return;
-    },
+    'update'       => \&_prepare_update,
     'pre-receive'  => \&_prepare_receive,
     'post-receive' => \&_prepare_receive,
 );
+
+################
+# This routine loads every plugin configured in the githooks.plugin
+# option.
 
 sub _load_plugins {
     my ($git) = @_;
@@ -282,6 +311,10 @@ sub _load_plugins {
     return;
 }
 
+# This is the main routine of Git::Hooks. It gets the original hook
+# name and arguments, sets up the environment, loads plugins and
+# invokes the appropriate hook functions.
+
 sub run_hook {
     my ($hook_name, @args) = @_;
 
@@ -291,23 +324,20 @@ sub run_hook {
 
     # Some hooks need some argument munging before we invoke them
     if (my $prepare = $prepare_hook{$hook_name}) {
-        $prepare->($git, @args);
+        $prepare->($git, \@args);
     }
 
     _load_plugins($git);
-
-    my $errors = 0;
 
     # Call every hook function installed by the hook scripts before.
     foreach my $hook (values %{$Hooks{$hook_name}}) {
         my $ok = eval { $hook->($git, @args) };
         if (defined $ok) {
             # Modern hooks return a boolean value indicating their success.
-            $errors++ unless $ok;
+            # If they fail they invoke Git::More::error.
         } elsif (length $@) {
             # Old hooks die when they fail...
             $git->error(__PACKAGE__ . "($hook_name)", $@);
-            $errors++;
         } else {
             # ...and return undef when they succeed.
         }
@@ -321,16 +351,15 @@ sub run_hook {
         ) {
             opendir my $dh, $dir
                 or $git->error(__PACKAGE__, ": cannot opendir $dir: $!\n")
-                    and $errors++
-                        and next;
+                    and next;
             foreach my $file (grep {-f && -x} map {catfile($dir, $_)} readdir $dh) {
                 spawn_external_file($git, $file, $hook_name, @args)
-                    or $errors++;
+                    or $git->error(__PACKAGE__, ": error in external hook '$file'\n");
             }
         }
     }
 
-    die "\n" if $errors;
+    die "\n" if scalar($git->get_errors());
 
     return;
 }
@@ -348,7 +377,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.038
+version 0.039
 
 =head1 SYNOPSIS
 
@@ -387,20 +416,21 @@ options. (More on this later.)
 "Git is a fast, scalable, distributed revision control system with an
 unusually rich command set that provides both high-level operations
 and full access to
-internals. (L<https://github.com/gitster/git#readme>)"
+internals. (L<Git README|https://github.com/gitster/git#readme>)"
 
 In order to really understand what this is all about you need to
-understand Git L<http://git-scm.org/> and its hooks. You can read
-everything about this in the documentation references on that site
-L<http://git-scm.com/documentation>.
+understand L<Git|http://git-scm.org/> and its hooks. You can read
+everything about this in the
+L<documentation|http://git-scm.com/documentation> references on that
+site.
 
-A hook is a specifically named program that is called by the git
-program during the execution of some operations. At the last count,
-there were exactly 16 different hooks which can be used
-(L<http://schacon.github.com/git/githooks.html>). They must reside
-under the C<.git/hooks> directory in the repository. When you create a
-new repository, you get some template files in this directory, all of
-them having the C<.sample> suffix and helpful instructions inside
+A L<Git hook|http://schacon.github.com/git/githooks.html> is a
+specifically named program that is called by the git program during
+the execution of some operations. At the last count, there were
+exactly 16 different hooks which can be used. They must reside under
+the C<.git/hooks> directory in the repository. When you create a new
+repository, you get some template files in this directory, all of them
+having the C<.sample> suffix and helpful instructions inside
 explaining how to convert them into working hooks.
 
 When Git is performing a commit operation, for example, it calls these
@@ -433,7 +463,7 @@ This arrangement is inefficient in two ways. First because each script
 runs as a separate process, which usually have a high start up cost
 because they are, well, scripts and not binaries. (For a dissent view
 on this, see
-L<http://gnustavo.wordpress.com/2012/06/28/programming-languages-start-up-times/>.)
+L<this|http://gnustavo.wordpress.com/2012/06/28/programming-languages-start-up-times/>.)
 And second, because as each script is called in turn they have no
 memory of the scripts called before and have to gather the information
 about the transaction again and again, normally by calling the C<git>
@@ -600,7 +630,7 @@ push to the repository and affect which Git refs.
 
 =item * Git::Hooks::CheckJira
 
-Integrate Git with the JIRA L<http://www.atlassian.com/software/jira/>phase
+Integrate Git with the L<JIRA|http://www.atlassian.com/software/jira/>
 ticketing system by requiring that every commit message cites valid
 JIRA issues.
 
@@ -652,10 +682,10 @@ another level of directories, named after the default hook names,
 under which you can drop your external hooks.
 
 For example, let's say you want to use some of the hooks in the
-standard Git package
-(L<https://github.com/gitster/git/blob/b12905140a8239ac687450ad43f18b5f0bcfb62e/contrib/hooks/update-paranoid>). You
-should copy each of those scripts to a file under the appropriate hook
-directory, like this:
+L<standard Git
+package|https://github.com/gitster/git/blob/b12905140a8239ac687450ad43f18b5f0bcfb62e/contrib/hooks/>).
+You should copy each of those scripts to a file under the appropriate
+hook directory, like this:
 
 =over
 
@@ -826,7 +856,7 @@ if it can't figure it out.
 If the user name is not directly available in an environment variable
 you may set this option to a code snippet by prefixing it with
 C<eval:>. The code will be evaluated and its value will be used as the
-user name. For example, RhodeCode's (L<http://rhodecode.org/>) up to
+user name. For example, L<RhodeCode's|http://rhodecode.org/> up to
 version 1.3.6 used to pass the authenticated user name in the
 C<RHODECODE_USER> environment variable. From version 1.4.0 on it
 stopped using this variable and started to use another variable with
@@ -978,8 +1008,8 @@ This routine returns a boolean indicating if REF matches one of the
 ref-specs in SPECS. REF is the complete name of a Git ref and SPECS is
 a list of strings, each one specifying a rule for matching ref names.
 
-As a special case, it returns true if there is no SPEC whatsoever,
-meaning that by default all refs are enabled.
+As a special case, it returns true if REF is undef or if there is no
+SPEC whatsoever, meaning that by default all refs/commits are enabled.
 
 You may want to use it, for example, in an C<update>, C<pre-receive>,
 or C<post-receive> hook which may be enabled depending on the

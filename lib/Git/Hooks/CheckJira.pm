@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '0.038';
+  $Git::Hooks::CheckJira::VERSION = '0.039';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -222,22 +222,25 @@ sub check_commit_msg {
 
     # Filter out JIRAs not belonging to any of the specific projects,
     # if any. We don't care about them.
-    if (my @projects = $git->get_config($CFG => 'project')) {
-        my %projects = map {($_ => undef)} @projects;
-        @keys = grep {/([^-]+)/ && exists $projects{$1}} @keys;
+    if ($nkeys) {
+        if (my @projects = $git->get_config($CFG => 'project')) {
+            my %projects = map {($_ => undef)} @projects;
+            @keys = grep {/([^-]+)/ && exists $projects{$1}} @keys;
+        }
     }
 
     unless (@keys) {
         if ($git->get_config($CFG => 'require')) {
             my $shortid = substr $commit->{commit}, 0, 8;
+            my $in_ref  = $ref || "with no ref pointing to it";
             if (@keys == $nkeys) {
-                $git->error($PKG, "commit $shortid (in $ref) does not cite any JIRA in its message.\n");
+                $git->error($PKG, "commit $shortid ($in_ref) does not cite any JIRA in its message.\n");
                 return 0;
             } else {
-                my $project = join(' ', $git->get_config($CFG => 'project'));
+                my $projects = join(' ', $git->get_config($CFG => 'project'));
                 $git->error($PKG, <<"EOF");
-commit $shortid (in $ref) does not cite any JIRA from the expected
-projects ($project) in its message.
+commit $shortid ($in_ref) does not cite any JIRA from the expected
+projects ($projects) in its message.
 EOF
                 return 0;
             }
@@ -254,7 +257,7 @@ sub check_message_file {
 
     _setup_config($git);
 
-    my $current_branch = 'refs/heads/' . $git->get_current_branch();
+    my $current_branch = $git->get_current_branch();
     return 1 unless is_ref_enabled($current_branch, $git->get_config($CFG => 'ref'));
 
     my $msg = read_file($commit_msg_file)
@@ -266,7 +269,7 @@ sub check_message_file {
 
     return check_commit_msg(
         $git,
-        { commit => '', body => $msg }, # fake a commit hash to simplify check_commit_msg
+        { commit => '0' x 40, body => $msg }, # fake a commit hash to simplify check_commit_msg
         $current_branch,
     );
 }
@@ -327,7 +330,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 0.038
+version 0.039
 
 =head1 DESCRIPTION
 
@@ -423,8 +426,8 @@ C<JIRA::Client> object.
 By default, JIRA keys are matched with the regex
 C</\b[A-Z][A-Z]+-\d+\b/>, meaning, a sequence of two or more capital
 letters, followed by an hyphen, followed by a sequence of digits. If
-you customized your JIRA project keys
-(L<https://confluence.atlassian.com/display/JIRA/Configuring+Project+Keys>),
+you customized your L<JIRA project
+keys|https://confluence.atlassian.com/display/JIRA/Configuring+Project+Keys>,
 you may need to customize how this hook is going to match them. Set
 this option to a suitable regex to match a complete JIRA issue key.
 
@@ -531,7 +534,7 @@ B<JIRA::Client>
 =head1 REFERENCES
 
 This script is heavily inspired (and sometimes derived) from Joyjit
-Nath's git-jira-hook (L<https://github.com/joyjit/git-jira-hook>).
+Nath's L<git-jira-hook|https://github.com/joyjit/git-jira-hook>.
 
 =head1 AUTHOR
 

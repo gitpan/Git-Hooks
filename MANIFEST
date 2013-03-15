@@ -1,6 +1,7 @@
 Changes
 LICENSE
 MANIFEST
+MANIFEST.SKIP
 META.yml
 Makefile.PL
 README
@@ -24,7 +25,7 @@ t/02-check-structure.t
 t/02-externals.t
 t/02-gerrit-change-id.t
 t/02-noplugin.t
-t/GITPERLLIB
+t/GERRIT_CONFIG
 t/make-debug-environment.sh
 t/release-kwalitee.t
 t/release-pod-coverage.t

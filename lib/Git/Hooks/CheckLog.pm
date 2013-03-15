@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckLog;
 {
-  $Git::Hooks::CheckLog::VERSION = '0.038';
+  $Git::Hooks::CheckLog::VERSION = '0.039';
 }
 # ABSTRACT: Git::Hooks plugin to enforce commit log policies.
 
@@ -307,7 +307,7 @@ Git::Hooks::CheckLog - Git::Hooks plugin to enforce commit log policies.
 
 =head1 VERSION
 
-version 0.038
+version 0.039
 
 =head1 DESCRIPTION
 
@@ -459,27 +459,30 @@ C<pre-receive> hooks. It needs a C<Git::More> object.
 
 =item * B<git-commit(1) Manual Page>
 
-(L<http://www.kernel.org/pub/software/scm/git/docs/git-commit.html>)
-This Git manual page has a section called DISCUSSION which discusses
-some common log message policies.
+This L<Git manual
+page|<http://www.kernel.org/pub/software/scm/git/docs/git-commit.html>
+has a section called DISCUSSION which discusses some common log
+message policies.
 
 =item * B<Linus Torvalds GitHub rant>
 
-(L<https://github.com/torvalds/linux/pull/17#issuecomment-5659933>) In
-this note, Linus says why he dislikes GitHub's pull request interface,
-mainly because it doesn't allow him to enforce log message formatting
+In L<this
+note|https://github.com/torvalds/linux/pull/17#issuecomment-5659933>,
+Linus says why he dislikes GitHub's pull request interface, mainly
+because it doesn't allow him to enforce log message formatting
 policies.
 
 =item * B<MediaWiki Git/Commit message guidelines>
 
-(L<http://www.mediawiki.org/wiki/Git/Commit_message_guidelines>) This
-document defines the MediaWiki's project commit log message guidelines.
+L<This
+document|http://www.mediawiki.org/wiki/Git/Commit_message_guidelines>
+defines the MediaWiki's project commit log message guidelines.
 
 =item * B<Proper Git Commit Messages and an Elegant Git History>
 
-(L<http://ablogaboutcode.com/2011/03/23/proper-git-commit-messages-and-an-elegant-git-history/>)
-This is a good discussion about commit log message formatting and the
-reasons behind them.
+L<This is a good
+discussion|http://ablogaboutcode.com/2011/03/23/proper-git-commit-messages-and-an-elegant-git-history/>
+about commit log message formatting and the reasons behind them.
 
 =back
 
