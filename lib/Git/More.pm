@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.039';
+  $Git::More::VERSION = '0.040';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -398,7 +398,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.039
+version 0.040
 
 =head1 SYNOPSIS
 
@@ -662,7 +662,7 @@ die.
 
 =head2 get_errors
 
-This method returns the list of error messages recorded so far by the
+This method returns a list of all error messages recorded with the
 C<error> method.
 
 =head1 SEE ALSO

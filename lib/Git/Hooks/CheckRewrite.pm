@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckRewrite;
 {
-  $Git::Hooks::CheckRewrite::VERSION = '0.039';
+  $Git::Hooks::CheckRewrite::VERSION = '0.040';
 }
 # ABSTRACT: Git::Hooks plugin for checking against unsafe rewrites
 
@@ -176,7 +176,7 @@ Git::Hooks::CheckRewrite - Git::Hooks plugin for checking against unsafe rewrite
 
 =head1 VERSION
 
-version 0.039
+version 0.040
 
 =head1 DESCRIPTION
 
