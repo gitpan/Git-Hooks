@@ -151,13 +151,14 @@ my %WriteMakefileArgs = (
     'File::Slurp' => '0',
     'File::Spec::Functions' => '0',
     'File::Temp' => '0',
+    'Gerrit::REST' => '0',
     'List::MoreUtils' => '0',
     'parent' => '0',
     'strict' => '0',
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.040',
+  'VERSION' => '0.041',
   'test' => {
     'TESTS' => 't/*.t'
   },

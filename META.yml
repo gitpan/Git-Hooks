@@ -24,6 +24,7 @@ meta-spec:
   version: 1.4
 name: Git-Hooks
 recommends:
+  Gerrit::Client: 0.002
   JIRA::Client: 0
   Text::SpellChecker: 0
 requires:
@@ -36,6 +37,7 @@ requires:
   File::Slurp: 0
   File::Spec::Functions: 0
   File::Temp: 0
+  Gerrit::REST: 0
   List::MoreUtils: 0
   parent: 0
   perl: 5.010
@@ -45,4 +47,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 0.040
+version: 0.041

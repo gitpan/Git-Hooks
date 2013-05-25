@@ -160,8 +160,8 @@ sub new_repos {
 
 	    $repo = Git::More->repository(Directory => '.');
 
-	    $repo->command(config => 'user.mail', 'myself@example.com');
-	    $repo->command(config => 'user.name', 'My Self');
+	    $repo->command(config => 'user.email', 'myself@example.com');
+	    $repo->command(config => 'user.name',  'My Self');
 	    $repo->command(add    => $filename);
 	    $repo->command(commit => '-mx');
 	}
@@ -177,9 +177,9 @@ sub new_repos {
         my $E = shift;
         # The BAIL_OUT function can't show a message with newlines
         # inside. So, we have to make sure to get rid of any.
-        $E =~ s/\n//g;          # 
+        $E =~ s/\n//g;
         local $, = ':';
-	BAIL_OUT("Error setting up repos for test: Exception='$_[0]'; CWD=$T; git-version=$git_version; \@INC=(@INC).\n");
+	BAIL_OUT("Error setting up repos for test: Exception='$E'; CWD=$T; git-version=$git_version; \@INC=(@INC).\n");
     };
 }
 

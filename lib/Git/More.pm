@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.040';
+  $Git::More::VERSION = '0.041';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -137,6 +137,7 @@ sub get_config {
 
         # Set default values for undefined ones.
         $config{githooks}{externals} //= [1];
+        $config{githooks}{gerrit}{enabled} //= [1];
 
         _compatibilize_config(\%config);
 
@@ -347,10 +348,8 @@ sub authenticated_user {
             } else {
                 die __PACKAGE__, ": option userenv environment variable ($userenv) is not defined.\n";
             }
-        } elsif (my $user = $ENV{USER}) {
-            $git->{more}{authenticated_user} = $user;
         } else {
-            $git->{more}{authenticated_user} = undef;
+            $git->{more}{authenticated_user} = $ENV{GERRIT_USER_EMAIL} || $ENV{USER} || undef;
         }
     }
 
@@ -398,7 +397,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.040
+version 0.041
 
 =head1 SYNOPSIS
 

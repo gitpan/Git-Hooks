@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckAcls;
 {
-  $Git::Hooks::CheckAcls::VERSION = '0.040';
+  $Git::Hooks::CheckAcls::VERSION = '0.041';
 }
 # ABSTRACT: Git::Hooks plugin for branch/tag access control.
 
@@ -123,13 +123,13 @@ sub check_affected_refs {
         check_ref($git, $ref)
             or return 0;
     }
-
     return 1;
 }
 
 # Install hooks
 UPDATE      \&check_affected_refs;
 PRE_RECEIVE \&check_affected_refs;
+REF_UPDATE  \&check_affected_refs;
 
 1;
 
@@ -143,7 +143,7 @@ Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
 
 =head1 VERSION
 
-version 0.040
+version 0.041
 
 =head1 DESCRIPTION
 
@@ -164,6 +164,12 @@ performing the push can update the branch in question.
 This hook is invoked once in the remote repository during C<git push>,
 checking if the user performing the push can update every affected
 branch.
+
+=item * B<ref-update>
+
+This hook is invoked when a push request is received by Gerrit Code
+Review, to check if the user performing the push can update the branch
+in question.
 
 =back
 

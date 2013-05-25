@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckRewrite;
 {
-  $Git::Hooks::CheckRewrite::VERSION = '0.040';
+  $Git::Hooks::CheckRewrite::VERSION = '0.041';
 }
 # ABSTRACT: Git::Hooks plugin for checking against unsafe rewrites
 
@@ -140,6 +140,12 @@ sub check_rebase {
     # Find the base commit of the rebased sequence
     my $base_commit = $git->command_oneline('rev-list', '--topo-order', '--reverse', "$upstream..$branch");
 
+    # If $upstream is a decendant of $base, $base_commit is empty. In
+    # this situation the rebase will turn out to be a simple
+    # fast-forward merge from $branch on $upstream and there is
+    # nothing to lose.
+    return 1 unless $base_commit;
+
     # Find all branches containing that commit
     my @branches = _branches_containing($git, $base_commit);
 
@@ -176,7 +182,7 @@ Git::Hooks::CheckRewrite - Git::Hooks plugin for checking against unsafe rewrite
 
 =head1 VERSION
 
-version 0.040
+version 0.041
 
 =head1 DESCRIPTION
 
