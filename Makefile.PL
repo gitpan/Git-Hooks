@@ -158,7 +158,7 @@ my %WriteMakefileArgs = (
     'utf8' => '0',
     'warnings' => '0'
   },
-  'VERSION' => '0.041',
+  'VERSION' => '0.042',
   'test' => {
     'TESTS' => 't/*.t'
   },
