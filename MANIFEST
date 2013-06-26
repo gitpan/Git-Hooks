@@ -16,6 +16,7 @@ lib/Git/Hooks/CheckRewrite.pm
 lib/Git/Hooks/CheckStructure.pm
 lib/Git/Hooks/GerritChangeId.pm
 lib/Git/More.pm
+lib/Git/More/Message.pm
 t/00-load.t
 t/01-setup.t
 t/02-check-acls.t

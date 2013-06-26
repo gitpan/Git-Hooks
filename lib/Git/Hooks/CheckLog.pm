@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckLog;
 {
-  $Git::Hooks::CheckLog::VERSION = '0.042';
+  $Git::Hooks::CheckLog::VERSION = '0.043';
 }
 # ABSTRACT: Git::Hooks plugin to enforce commit log policies.
 
@@ -26,6 +26,7 @@ use utf8;
 use strict;
 use warnings;
 use Git::Hooks qw/:DEFAULT :utils/;
+use Git::More::Message;
 use File::Slurp;
 use List::MoreUtils qw/uniq/;
 
@@ -52,28 +53,6 @@ sub _setup_config {
 }
 
 ##########
-
-# Return the message or undef.
-
-sub read_msg_encoded {
-    my ($git, $msgfile) = @_;
-
-    my $encoding = $git->get_config(i18n => 'commitencoding') || 'utf-8';
-
-    my $msg = eval { read_file($msgfile, { binmode => ":encoding($encoding)", err_mode => 'carp' }) };
-    unless (defined $msg) {
-        $git->error($PKG, "Cannot read message file '$msgfile' with encoding '$encoding': $@\n");
-        return;
-    }
-
-    # Strip the patch data from the message.
-    $msg =~ s:^diff --git a/.*::ms;
-
-    # strip comment lines
-    $msg =~ s/^#.*\n?//mg;
-
-    return $msg;
-}
 
 # Return a Text::SpellChecker object or undef.
 
@@ -161,29 +140,25 @@ sub check_patterns {
 }
 
 sub check_title {
-    my ($git, $id, $title, $neck) = @_;
+    my ($git, $id, $title) = @_;
 
-    return 1 unless $git->get_config($CFG => 'title-required');
+    $git->get_config($CFG => 'title-required')
+        or return 1;
+
+    defined $title
+        or $git->error($PKG, "$id\'s log needs a title line!\n")
+            and return 0;
+
+    ($title =~ tr/\n/\n/) == 1
+        or $git->error($PKG, "$id\'s log title should have just one line!\n")
+            and return 0;
 
     my $errors = 0;
 
-    {
-        my $title_lines = ($title =~ tr/\n/\n/);
-        $title_lines += 1 if defined $neck;
-        $title_lines == 1
-            or $git->error($PKG, "$id\'s log title has $title_lines lines but should have only 1!\n")
-                and $errors++;
-    }
-
-    # Here I was going to check the $neck length to make sure there is
-    # only one blank line between the title and the body. However, I
-    # soon realised that Git takes care of this and gets rid of any
-    # extra blank line in the original message before passing it to
-    # the commit-msg hook.
-
     if (my $max_width = $git->get_config($CFG => 'title-max-width')) {
-        length($title) <= $max_width
-            or $git->error($PKG, "$id\'s log title should be at most $max_width characters wide, but it has " . length($title) . "!\n")
+        my $tlen = length($title) - 1; # discount the newline
+        $tlen <= $max_width
+            or $git->error($PKG, "$id\'s log title should be at most $max_width characters wide, but it has $tlen!\n")
                 and $errors++;
     }
 
@@ -208,14 +183,14 @@ sub check_title {
 sub check_body {
     my ($git, $id, $body) = @_;
 
-    return 1 unless $body;
+    return 1 unless defined $body && length $body;
 
     if (my $max_width = $git->get_config($CFG => 'body-max-width')) {
-        while ($body =~ /^(.*)/gm) {
-            my $line = $1;
-            length($line) <= $max_width
-                or $git->error($PKG, "$id\'s log body lines should be at most $max_width characters wide, but there is one with " . length($line) . "!\n")
-                    and return 0;
+        if (my @biggies = ($body =~ /^(.{$max_width,})/gm)) {
+            my $aremany = (@biggies == 1 ? "is " : "are ") . scalar(@biggies);
+            $git->error($PKG, "$id\'s log body lines should be at most $max_width characters wide, "
+                            . "but there $aremany bigger than that in it!\n");
+            return 0;
         }
     }
 
@@ -235,14 +210,11 @@ sub check_message {
 
     check_patterns($git, $id, $msg) or $errors++;
 
-    my ($title, $neck, $body) = split /(\n\n+)/s, $msg, 2;
+    my $cmsg = Git::More::Message->new($msg);
 
-    # If $msg is empty split makes $title undef
-    $title = '' unless defined $title;
+    check_title($git, $id, $cmsg->title) or $errors++;
 
-    check_title($git, $id, $title, $neck) or $errors++;
-
-    check_body($git, $id, $body) or $errors++;
+    check_body($git, $id, $cmsg->body) or $errors++;
 
     return $errors == 0;
 }
@@ -263,9 +235,12 @@ sub check_message_file {
 
     _setup_config($git);
 
-    my $msg = read_msg_encoded($git, $commit_msg_file);
+    my $msg = eval {$git->read_commit_msg_file($commit_msg_file)};
 
-    return 0 unless defined $msg;
+    unless (defined $msg) {
+        $git->error($PKG, "Cannot read commit message file '$commit_msg_file': $@\n");
+        return 0;
+    }
 
     return check_message($git, undef, $msg);
 }
@@ -320,7 +295,7 @@ Git::Hooks::CheckLog - Git::Hooks plugin to enforce commit log policies.
 
 =head1 VERSION
 
-version 0.042
+version 0.043
 
 =head1 DESCRIPTION
 
@@ -374,7 +349,7 @@ option:
 
     git config --add githooks.plugin CheckLog
 
-=for Pod::Coverage read_msg_encoded check_spelling check_patterns check_title check_body check_message check_ref
+=for Pod::Coverage check_spelling check_patterns check_title check_body check_message check_ref
 
 =head1 NAME
 

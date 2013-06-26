@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.042';
+  $Git::Hooks::VERSION = '0.043';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -22,7 +22,7 @@ BEGIN {                ## no critic (Subroutines::RequireArgUnpacking)
         qw/ APPLYPATCH_MSG PRE_APPLYPATCH POST_APPLYPATCH
             PRE_COMMIT PREPARE_COMMIT_MSG COMMIT_MSG
             POST_COMMIT PRE_REBASE POST_CHECKOUT POST_MERGE
-            PRE_RECEIVE UPDATE POST_RECEIVE POST_UPDATE
+            PRE_PUSH PRE_RECEIVE UPDATE POST_RECEIVE POST_UPDATE
             PRE_AUTO_GC POST_REWRITE
 
             REF_UPDATE PATCHSET_CREATED
@@ -77,13 +77,49 @@ sub is_ref_enabled {
     return 0;
 }
 
+# This is an internal routine used to invoke external hooks which need
+# to be fed information via STDIN.
+
+sub spawn_external_hook_with_feed {
+    my ($git, $file, $hook, $stdin, @args) = @_;
+
+    my $pid = open my $pipe, '|-'; ## no critic (InputOutput::RequireBriefOpen)
+
+    if (! defined $pid) {
+        die __PACKAGE__, ": can't fork: $!\n";
+    } elsif ($pid) {
+        # parent
+        print $pipe $stdin;
+        if (close $pipe) {
+            return 1;
+        } elsif ($!) {
+            die __PACKAGE__, ": Error closing pipe to external hook '$file': $!\n";
+        } else {
+            die __PACKAGE__, ": External hook '$file' exited with $?\n";
+        }
+    } else {
+        # child
+        exec {$file} ($hook, @args);
+        die __PACKAGE__, ": can't exec: $!\n";
+    }
+}
+
 # This is an internal routine used to invoke external hooks, feed them
 # the needed input and wait for them.
 
-sub spawn_external_file {
+sub spawn_external_hook {
     my ($git, $file, $hook, @args) = @_;
 
-    if ($hook !~ /^(?:pre|post)-receive$/) {
+    if ($hook =~ /^(?:pre-receive|post-receive|pre-push|post-rewrite)$/) {
+
+        # These hooks receive information via STDIN that we read once
+        # before invoking any hook. Now, we must regenerate the same
+        # information and output it to the external hooks we invoke.
+
+        my $stdin = join("\n", map {join(' ', @$_)} @{$git->get_input_data}) . "\n";
+        return spawn_external_hook_with_feed($git, $file, $hook, $stdin, @args);
+
+    } else {
 
         my $exit = system {$file} ($hook, @args);
 
@@ -100,30 +136,6 @@ sub spawn_external_file {
 
         return 0;
 
-    } else {
-
-        my $pid = open my $pipe, '|-'; ## no critic (InputOutput::RequireBriefOpen)
-
-        if (! defined $pid) {
-            die __PACKAGE__, ": can't fork: $!\n";
-        } elsif ($pid) {
-            # parent
-            foreach my $ref ($git->get_affected_refs()) {
-                my ($old, $new) = $git->get_affected_ref_range($ref);
-                say $pipe "$old $new $ref";
-            }
-            if (close $pipe) {
-                return 1;
-            } elsif ($!) {
-                die __PACKAGE__, ": Error closing pipe to external hook '$file': $!\n";
-            } else {
-                die __PACKAGE__, ": External hook '$file' exited with $?\n";
-            }
-        } else {
-            # child
-            exec {$file} ($hook, @args);
-            die __PACKAGE__, ": can't exec: $!\n";
-        }
     }
 }
 
@@ -242,15 +254,28 @@ sub eval_gitconfig {
 # The following routines prepare the arguments for some hooks to make
 # it easier to deal with them later on.
 
+# Some hooks get information from STDIN as text lines with
+# space-separated fields. This routine reads up all of STDIN and tucks
+# that information in the Git::More object.
+
+sub _prepare_input_data {
+    my ($git) = @_;
+    while (<STDIN>) { ## no critic (InputOutput::ProhibitExplicitStdin)
+        chomp;
+        $git->push_input_data([split]);
+    }
+    return;
+}
+
 # The pre-receive and post-receive hooks get the list of affected
 # commits via STDIN. This routine gets them all and set all affected
 # refs in the Git object.
 
 sub _prepare_receive {
     my ($git) = @_;
-    while (<STDIN>) { ## no critic (InputOutput::ProhibitExplicitStdin)
-        chomp;
-        my ($old_commit, $new_commit, $ref) = split;
+    _prepare_input_data($git);
+    foreach (@{$git->get_input_data()}) {
+        my ($old_commit, $new_commit, $ref) = @$_;
         $git->set_affected_ref($ref, $old_commit, $new_commit);
     }
     return;
@@ -387,6 +412,8 @@ sub _prepare_gerrit_ref_update {
 
 my %prepare_hook = (
     'update'           => \&_prepare_update,
+    'pre-push'         => \&_prepare_input_data,
+    'post-rewrite'     => \&_prepare_input_data,
     'pre-receive'      => \&_prepare_receive,
     'post-receive'     => \&_prepare_receive,
     'ref-update'       => \&_prepare_gerrit_ref_update,
@@ -495,7 +522,7 @@ sub run_hook {
                 or $git->error(__PACKAGE__, ": cannot opendir $dir: $!\n")
                     and next;
             foreach my $file (grep {-f && -x} map {catfile($dir, $_)} readdir $dh) {
-                spawn_external_file($git, $file, $hook_name, @args)
+                spawn_external_hook($git, $file, $hook_name, @args)
                     or $git->error(__PACKAGE__, ": error in external hook '$file'\n");
             }
         }
@@ -524,7 +551,7 @@ Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.042
+version 0.043
 
 =head1 SYNOPSIS
 
@@ -556,7 +583,7 @@ options. (More on this later.)
 
         run_hook($0, @ARGV);
 
-=for Pod::Coverage spawn_external_file grok_groups_spec grok_groups
+=for Pod::Coverage spawn_external_hook_with_feed spawn_external_hook grok_groups_spec grok_groups
 
 =head1 INTRODUCTION
 
@@ -1221,7 +1248,29 @@ need to implement more than one specific hook.
 
 =item * POST_MERGE(GIT, is-squash-merge)
 
+=item * PRE_PUSH(GIT, remote-name, remote-url)
+
+The C<pre-push> hook was introduced in Git 1.8.2. The default hook
+gets two arguments: the name and the URL of the remote which is being
+pushed to. It also gets a variable number of arguments via STDIN with
+lines of the form:
+
+    <local ref> SP <local sha1> SP <remote ref> SP <remote sha1> LF
+
+The information from these lines is read and can be fetched by the
+hooks using the C<Git::Hooks::get_input_data> method.
+
 =item * PRE_RECEIVE(GIT)
+
+The C<pre-receive> hook gets a variable number of arguments via STDIN
+with lines of the form:
+
+    <old-value> SP <new-value> SP <ref-name> LF
+
+The information from these lines is read and can be fetched by the
+hooks using the C<Git::Hooks::get_input_data> method or, perhaps more
+easily, by using the C<Git::More::get_affected_refs> and the
+C<Git::More::get_affected_ref_rage> methods.
 
 =item * UPDATE(GIT, updated-ref-name, old-object-name, new-object-name)
 
@@ -1232,6 +1281,16 @@ need to implement more than one specific hook.
 =item * PRE_AUTO_GC(GIT)
 
 =item * POST_REWRITE(GIT, command)
+
+The C<post-rewrite> hook gets a variable number of arguments via STDIN
+with lines of the form:
+
+    <old sha1> SP <new sha1> SP <extra info> LF
+
+The C<extra info> and the preceeding SP are optional.
+
+The information from these lines is read and can be fetched by the
+hooks using the C<Git::Hooks::get_input_data> method.
 
 =item * REF_UPDATE(GIT, OPTS)
 =item * PATCHSET_CREATED(GIT, OPTS)

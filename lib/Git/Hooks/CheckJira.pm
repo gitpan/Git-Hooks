@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '0.042';
+  $Git::Hooks::CheckJira::VERSION = '0.043';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -113,7 +113,7 @@ sub get_issue {
 
     # Try to get the issue from the cache
     unless (exists $cache->{keys}{$key}) {
-        $cache->{keys}{$key} = eval { $cache->{jira}->getIssue($key) };
+        $cache->{keys}{$key} = eval { $jira->getIssue($key) };
         length $@
             and $git->error($PKG, "cannot get issue $key: $@\n")
                 and return;
@@ -342,7 +342,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 0.042
+version 0.043
 
 =head1 DESCRIPTION
 

@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.042';
+  $Git::More::VERSION = '0.043';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -18,6 +18,7 @@ use parent -norequire, 'Git';
 
 use Error qw(:try);
 use Carp;
+use File::Slurp;
 use Git::Hooks qw/:utils/;
 
 sub _compatibilize_config {
@@ -257,6 +258,38 @@ sub get_commit_msg {
     die __PACKAGE__, "::get_commit_msg: cannot get commit msg.\n";
 }
 
+sub read_commit_msg_file {
+    my ($git, $msgfile) = @_;
+
+    my $encoding = $git->get_config(i18n => 'commitencoding') || 'utf-8';
+
+    my $msg_ref = read_file($msgfile, {binmode => ":encoding($encoding)", scalar_ref => 1});
+
+    # Truncate the message just before the diff, if any.
+    $$msg_ref =~ s:\ndiff --git .*::s;
+
+    my ($pid, $in, $out, $ctx) = $git->command_bidi_pipe(qw/stripspace -s/);
+    print $out $$msg_ref;
+    close $out;
+    my $msg = do {
+        local $/ = undef;
+        <$in>;
+    };
+    $git->command_close_bidi_pipe($pid, $in, undef, $ctx);
+
+    return $msg;
+}
+
+sub write_commit_msg_file {
+    my ($git, $msgfile, @msg) = @_;
+
+    my $encoding = $git->get_config(i18n => 'commitencoding') || 'utf-8';
+
+    write_file($msgfile, {binmode => ":encoding($encoding)"}, @msg);
+
+    return;
+}
+
 sub get_diff_files {
     my ($git, @args) = @_;
     my %affected;
@@ -329,6 +362,17 @@ sub get_affected_ref_commits {
     return @{$affected->{$ref}{commits}};
 }
 
+sub push_input_data {
+    my ($git, $data) = @_;
+    push @{$git->{more}{input_data}}, $data;
+    return;
+}
+
+sub get_input_data {
+    my ($git) = @_;
+    return $git->{more}{input_data} || [];
+}
+
 sub set_authenticated_user {
     my ($git, $user) = @_;
     return $git->{more}{authenticated_user} = $user;
@@ -397,7 +441,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.042
+version 0.043
 
 =head1 SYNOPSIS
 
@@ -579,6 +623,57 @@ rev-list> document):
 This method returns the commit message (a.k.a. body) of the commit
 identified by COMMIT_ID. The result is a string.
 
+=head2 read_commit_msg_file FILENAME
+
+This method returns the relevant contents of the commit message file
+called FILENAME. It's useful during the C<commit-msg> and the
+C<prepare-commit-msg> hooks.
+
+The file is read using the character encoding defined by the
+C<i18n.commitencoding> configuration option or C<utf-8> if not
+defined.
+
+Some non-relevant contents are stripped off the file. Specifically:
+
+=over
+
+=item * diff data
+
+Sometimes, the commit message file contains the diff data for the
+commit. This data begins with a line starting with the fixed string
+C<diff --git a/>. Everything from such a line on is stripped off the
+file.
+
+=item * comment lines
+
+Every line beginning with a C<#> character is stripped off the file.
+
+=item * trailing spaces
+
+Any trailing space is stripped off from all lines in the file.
+
+=item * trailing empty lines
+
+Any empty line at the end is stripped off from the file, making sure
+it ends in a single newline.
+
+=back
+
+All this cleanup is performed to make it easier for different plugins
+to analyse the commit message using a canonical base.
+
+=head2 write_commit_msg_file FILENAME, MSG, ...
+
+This method writes the list of strings C<MSG> to FILENAME. It's useful
+during the C<commit-msg> and the C<prepare-commit-msg> hooks.
+
+The file is written to using the character encoding defined by the
+C<i18n.commitencoding> configuration option or C<utf-8> if not
+defined.
+
+An empty line (C<\n\n>) is inserted between every pair of MSG
+arguments, if there is more than one, of course.
+
 =head2 get_diff_files DIFFARGS...
 
 This method invokes the command C<git diff --name-status> with extra
@@ -634,6 +729,20 @@ This method returns the username of the authenticated user performing
 the Git action. It groks it from the C<githooks.userenv> configuration
 variable specification, which is described in the C<Git::Hooks>
 documentation. It's useful for most access control check plugins.
+
+=head2 push_input_data DATA
+
+This method gets a single value and tucks it in an internal list so
+that every piece of data can be gotten later with the
+C<get_input_data> method below.
+
+It's used by C<Git::Hooks> to save arguments read from STDIN by some
+Git hooks like pre-receive, post-receive, pre-push, and post-rewrite.
+
+=head2 get_input_data
+
+This method returns an array-ref pointing to a list of all pieces of
+data saved by calls to C<push_input_data> method above.
 
 =head2 set_authenticated_user USERNAME
 
