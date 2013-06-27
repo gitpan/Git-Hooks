@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckLog;
 {
-  $Git::Hooks::CheckLog::VERSION = '0.043';
+  $Git::Hooks::CheckLog::VERSION = '0.044';
 }
 # ABSTRACT: Git::Hooks plugin to enforce commit log policies.
 
@@ -295,7 +295,7 @@ Git::Hooks::CheckLog - Git::Hooks plugin to enforce commit log policies.
 
 =head1 VERSION
 
-version 0.043
+version 0.044
 
 =head1 DESCRIPTION
 

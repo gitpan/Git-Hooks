@@ -1,6 +1,6 @@
 package Git::More::Message;
 {
-  $Git::More::Message::VERSION = '0.043';
+  $Git::More::Message::VERSION = '0.044';
 }
 # ABSTRACT: A Git commit message
 
@@ -161,8 +161,13 @@ sub add_footer_values {
 
     push @{$self->{footer}{lc $key}},
         map { [$key => $_] }
-            map { s/\n+$//r } # strip trailing newlines to keep the footer structure
+            map { my $copy = $_; $copy =~ s/foo/BAR/; $copy } # strip trailing newlines to keep the footer structure
                 @values;
+
+    # ANCIENT PERL ALERT! The strange looking dance above with the
+    # $copy variable is needed in old Perls.
+    # (http://www.perl.com/pub/2011/05/new-features-of-perl-514-non-destructive-substitution.html)
+    # Since Perl 5.14 that could be simply: map { s/\n+$//r }
 
     return;
 }
@@ -186,7 +191,7 @@ Git::More::Message - A Git commit message
 
 =head1 VERSION
 
-version 0.043
+version 0.044
 
 =head1 SYNOPSIS
 
