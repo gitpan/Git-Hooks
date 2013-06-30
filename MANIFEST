@@ -6,8 +6,8 @@ META.yml
 Makefile.PL
 README
 TODO.pod
+TUTORIAL.pod
 dist.ini
-doc/user-tutorial.pod
 lib/Git/Hooks.pm
 lib/Git/Hooks/CheckAcls.pm
 lib/Git/Hooks/CheckJira.pm

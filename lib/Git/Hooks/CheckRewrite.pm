@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckRewrite;
 {
-  $Git::Hooks::CheckRewrite::VERSION = '0.045';
+  $Git::Hooks::CheckRewrite::VERSION = '0.046';
 }
 # ABSTRACT: Git::Hooks plugin for checking against unsafe rewrites
 
@@ -54,7 +54,7 @@ sub _branches_containing {
 sub record_commit_parents {
     my ($git) = @_;
 
-    # Here we record the HEAD commit's onw id and it's parent's ids in
+    # Here we record the HEAD commit's own id and it's parent's ids in
     # a file under the git directory. The file has two lines in this
     # format:
 
@@ -76,7 +76,7 @@ sub check_commit_amend {
     my $record_file = _record_filename($git);
 
     -r $record_file
-        or $git->error($PKG, "Can't read $record_file. You probably forgot to symlink the pre-commmit hook.\n")
+        or $git->error($PKG, "Can't read $record_file. You probably forgot to symlink the pre-commit hook.\n")
             and return 0;
 
     my ($old_commit, $old_parents) = read_file($record_file);
@@ -104,14 +104,17 @@ sub check_commit_amend {
         my $branches = join "\n    ", @branches;
         $git->error($PKG, <<"EOF");
 
-You've just performed un unsafe commit --amend because your original
-HEAD ($old_commit) is still reachable by the following branch(es):
+You've just performed un unsafe "git commit --amend" because your
+original HEAD ($old_commit) is still reachable by the following
+branch(es):
 
     $branches
 
-You can revert the amend with the following command:
+Consider amending or undoing it:
 
-    git reset --soft $old_commit
+        git commit --amend      # to amend it
+        git reset --soft HEAD^  # to undo it
+
 EOF
         return 0;
     }
@@ -135,13 +138,11 @@ sub check_rebase {
         };
     }
 
-    my $log = $git->command(qw/log --oneline --graph --decorate --all/);
-
     # Find the base commit of the rebased sequence
     my $base_commit = $git->command_oneline('rev-list', '--topo-order', '--reverse', "$upstream..$branch");
 
-    # If $upstream is a decendant of $base, $base_commit is empty. In
-    # this situation the rebase will turn out to be a simple
+    # If $upstream is a decendant of $branch, $base_commit is
+    # empty. In this situation the rebase will turn out to be a simple
     # fast-forward merge from $branch on $upstream and there is
     # nothing to lose.
     return 1 unless $base_commit;
@@ -182,7 +183,7 @@ Git::Hooks::CheckRewrite - Git::Hooks plugin for checking against unsafe rewrite
 
 =head1 VERSION
 
-version 0.045
+version 0.046
 
 =head1 DESCRIPTION
 

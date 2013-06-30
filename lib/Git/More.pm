@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.045';
+  $Git::More::VERSION = '0.046';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -137,8 +137,9 @@ sub get_config {
         }
 
         # Set default values for undefined ones.
-        $config{githooks}{externals} //= [1];
+        $config{githooks}{externals}       //= [1];
         $config{githooks}{gerrit}{enabled} //= [1];
+        $config{githooks}{'abort-commit'}  //= [1];
 
         _compatibilize_config(\%config);
 
@@ -460,7 +461,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.045
+version 0.046
 
 =head1 SYNOPSIS
 
