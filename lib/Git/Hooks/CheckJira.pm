@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '0.046';
+  $Git::Hooks::CheckJira::VERSION = '0.047';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -233,7 +233,7 @@ sub check_commit_msg {
 
     unless (@keys) {
         if ($git->get_config($CFG => 'require')) {
-            my $shortid = substr $commit->{commit}, 0, 8;
+            my $shortid = exists $commit->{commit} ? substr($commit->{commit}, 0, 8) : '';
             my $in_ref  = $ref || "with no ref pointing to it";
             if (@keys == $nkeys) {
                 $git->error($PKG, "commit $shortid ($in_ref) does not cite any JIRA in its message.\n");
@@ -280,7 +280,7 @@ sub check_message_file {
 
     return check_commit_msg(
         $git,
-        { commit => '0' x 40, body => $msg }, # fake a commit hash to simplify check_commit_msg
+        { body => $msg }, # fake a commit hash to simplify check_commit_msg
         $current_branch,
     );
 }
@@ -336,13 +336,15 @@ __END__
 
 =pod
 
+=encoding UTF-8
+
 =head1 NAME
 
 Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
 =head1 VERSION
 
-version 0.046
+version 0.047
 
 =head1 DESCRIPTION
 
@@ -595,7 +597,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2013 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2014 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

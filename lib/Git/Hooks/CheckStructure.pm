@@ -17,7 +17,7 @@
 
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.046';
+  $Git::Hooks::CheckStructure::VERSION = '0.047';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -199,13 +199,15 @@ __END__
 
 =pod
 
+=encoding UTF-8
+
 =head1 NAME
 
 Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation.
 
 =head1 VERSION
 
-version 0.046
+version 0.047
 
 =head1 DESCRIPTION
 
@@ -446,7 +448,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2013 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2014 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

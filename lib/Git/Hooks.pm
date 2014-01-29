@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.046';
+  $Git::Hooks::VERSION = '0.047';
 }
 # ABSTRACT: A framework for implementing Git hooks.
 
@@ -427,8 +427,8 @@ my %prepare_hook = (
 sub _load_plugins {
     my ($git) = @_;
 
-    my @enabled_plugins  = $git->get_config(githooks => 'plugin');
-    my %disabled_plugins = map {($_ => undef)} $git->get_config(githooks => 'disable');
+    my @enabled_plugins  = map {split} $git->get_config(githooks => 'plugin');
+    my %disabled_plugins = map {($_ => undef)} map {split} $git->get_config(githooks => 'disable');
 
     return () unless @enabled_plugins; # no one configured
 
@@ -456,7 +456,7 @@ sub _load_plugins {
                 # It must be a module name
 
                 ## no critic (ErrorHandling::RequireCheckingReturnValueOfEval, Modules::RequireBarewordIncludes)
-                eval {require "$prefix$plugin"};
+                eval "require $prefix$plugin";
                 ## use critic
 
             } else {
@@ -538,10 +538,9 @@ sub run_hook {
                 and not $git->get_config(githooks => 'abort-commit')) {
             warn <<"EOF";
 ATTENTION: To fix the problems in this commit, please consider
-amending or undoing it:
+amending it:
 
         git commit --amend      # to amend it
-        git reset --soft HEAD^  # to undo it
 
 EOF
         } else {
@@ -559,13 +558,15 @@ __END__
 
 =pod
 
+=encoding UTF-8
+
 =head1 NAME
 
 Git::Hooks - A framework for implementing Git hooks.
 
 =head1 VERSION
 
-version 0.046
+version 0.047
 
 =head1 SYNOPSIS
 
@@ -758,7 +759,7 @@ For example:
             my ($mode, $sha, $n, $name) = split / /;
             my $size = $git->command('cat-file' => '-s', $sha);
             $size <= $LIMIT
-                or $git-error('CheckSize', "File '$name' has $size bytes, more than our limit of $LIMIT.\n"
+                or $git->error('CheckSize', "File '$name' has $size bytes, more than our limit of $LIMIT.\n"
                     and $errors++;
         }
 
@@ -950,17 +951,20 @@ repository. Note that this will fetch all C<--system>, C<--global>,
 and C<--local> options, in this order. You may use this mechanism to
 define configuration global to a user or local to a repository.
 
-=head2 githooks.plugin PLUGIN
+=head2 githooks.plugin PLUGIN...
 
-To enable a plugin you must add it to this configuration option, like
-this:
+To enable one or more plugins you must add them to this configuration
+option, like this:
 
-    $ git config --add githooks.plugin CheckAcls
+    $ git config --add githooks.plugin CheckAcls CheckJira
 
-To enable more than one plugin, simply repeat the command for the next
-one:
+You can add another list to the same variable to enable more plugins,
+like this:
 
-    $ git config --add githooks.plugin CheckJira
+    $ git config --add githooks.plugin CheckLog
+
+This is usefull, for example, to enable some plugins globally and
+others locally, per repository.
 
 A plugin may hook itself to one or more hooks. C<CheckJira>, for
 example, hook itself to three: C<commit-msg>, C<pre-receive>, and
@@ -1003,16 +1007,17 @@ module. For example:
 
     $ git config --add githooks.plugin My::Hook::CheckSomething
 
-=head2 githooks.disable PLUGIN
+=head2 githooks.disable PLUGIN...
 
 This option disables plugins enabled by the C<githooks.plugin>
 option. It's useful if you want to enable a plugin globally and only
 disable it for some repositories. For example:
 
     $ git config --global --add githooks.plugin  CheckJira
+
     $ git config --local  --add githooks.disable CheckJira
 
-You also may temporarily disable a plugin by assigning to "0" an
+You may also temporarily disable a plugin by assigning to "0" an
 environment variable with its name. This is useful sometimes, when you
 are denied some perfectly fine commit by one of the check plugins. For
 example, suppose you got an error from the CheckLog plugin because you
@@ -1457,7 +1462,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2013 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2014 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

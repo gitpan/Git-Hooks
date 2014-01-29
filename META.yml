@@ -3,13 +3,13 @@ abstract: 'A framework for implementing Git hooks.'
 author:
   - 'Gustavo L. de M. Chaves <gnustavo@cpan.org>'
 build_requires:
-  Config: 0
   Cwd: 0
   File::Path: 2.08
   File::Remove: 0
   File::pushd: 0
   Test::More: 0
   URI::file: 0
+  lib: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.30
   File::Slurp: 0
@@ -17,7 +17,7 @@ configure_requires:
   strict: 0
   warnings: 0
 dynamic_config: 0
-generated_by: 'Dist::Zilla version 4.300030, CPAN::Meta::Converter version 2.120921'
+generated_by: 'Dist::Zilla version 5.006, CPAN::Meta::Converter version 2.132830'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -47,4 +47,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 0.046
+version: 0.047
