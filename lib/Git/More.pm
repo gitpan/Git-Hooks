@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.047';
+  $Git::More::VERSION = '0.048';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -424,7 +424,7 @@ sub get_current_branch {
     my ($git) = @_;
     my $branch;
     try {
-        $branch = $git->command_oneline(qw/symbolic-ref HEAD/);
+        $branch = $git->command_oneline([qw/symbolic-ref HEAD/], { STDERR => 0});
     } otherwise {
         # In dettached head state
     };
@@ -463,7 +463,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.047
+version 0.048
 
 =head1 SYNOPSIS
 

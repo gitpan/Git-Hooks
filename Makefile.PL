@@ -119,7 +119,7 @@ use ExtUtils::MakeMaker 6.30;
 
 
 my %WriteMakefileArgs = (
-  'ABSTRACT' => 'A framework for implementing Git hooks.',
+  'ABSTRACT' => 'Framework for implementing Git (and Gerrit) hooks',
   'AUTHOR' => 'Gustavo L. de M. Chaves <gnustavo@cpan.org>',
   'CONFIGURE_REQUIRES' => {
     'ExtUtils::MakeMaker' => '6.30',
@@ -143,6 +143,7 @@ my %WriteMakefileArgs = (
     'File::Spec::Functions' => '0',
     'File::Temp' => '0',
     'Gerrit::REST' => '0',
+    'JIRA::REST' => '0',
     'List::MoreUtils' => '0',
     'parent' => '0',
     'strict' => '0',
@@ -158,7 +159,7 @@ my %WriteMakefileArgs = (
     'URI::file' => '0',
     'lib' => '0'
   },
-  'VERSION' => '0.047',
+  'VERSION' => '0.048',
   'test' => {
     'TESTS' => 't/*.t'
   },

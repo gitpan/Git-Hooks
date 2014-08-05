@@ -1,23 +1,8 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2012 by CPqD
-
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.047';
+  $Git::Hooks::CheckStructure::VERSION = '0.048';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -207,7 +192,7 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.047
+version 0.048
 
 =head1 DESCRIPTION
 

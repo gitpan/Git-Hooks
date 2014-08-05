@@ -1,23 +1,8 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2012 by CPqD
-
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 package Git::Hooks::CheckLog;
 {
-  $Git::Hooks::CheckLog::VERSION = '0.047';
+  $Git::Hooks::CheckLog::VERSION = '0.048';
 }
 # ABSTRACT: Git::Hooks plugin to enforce commit log policies.
 
@@ -297,7 +282,7 @@ Git::Hooks::CheckLog - Git::Hooks plugin to enforce commit log policies.
 
 =head1 VERSION
 
-version 0.047
+version 0.048
 
 =head1 DESCRIPTION
 
@@ -496,6 +481,19 @@ about commit log message formatting and the reasons behind them.
 
 L<This document|https://wiki.openstack.org/wiki/GitCommitMessages>
 defines the OpenStack's project commit policies.
+
+=item * B<A Note About Git Commit Messages>
+
+This L<blog
+post|http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html>
+argues briefly and convincingly for the use of a particular format for Git
+commit messages.
+
+=item * B<Git Commit Messages: 50/72 Formatting>
+
+This L<StackOverflow
+question|http://stackoverflow.com/questions/2290016/git-commit-messages-50-72-formatting>
+has a good discussion about the topic.
 
 =back
 
