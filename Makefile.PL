@@ -135,6 +135,7 @@ my %WriteMakefileArgs = (
   'PREREQ_PM' => {
     'Carp' => '0',
     'Cwd' => '0',
+    'Data::Dumper' => '0',
     'Data::Util' => '0',
     'Error' => '0',
     'Exporter' => '0',
@@ -143,7 +144,6 @@ my %WriteMakefileArgs = (
     'File::Spec::Functions' => '0',
     'File::Temp' => '0',
     'Gerrit::REST' => '0',
-    'JIRA::REST' => '0',
     'List::MoreUtils' => '0',
     'parent' => '0',
     'strict' => '0',
@@ -159,7 +159,7 @@ my %WriteMakefileArgs = (
     'URI::file' => '0',
     'lib' => '0'
   },
-  'VERSION' => '0.048',
+  'VERSION' => '0.049',
   'test' => {
     'TESTS' => 't/*.t'
   },

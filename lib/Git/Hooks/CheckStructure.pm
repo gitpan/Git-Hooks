@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.048';
+  $Git::Hooks::CheckStructure::VERSION = '0.049';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -116,7 +116,7 @@ sub check_added_files {
         # check_structure.
         my ($code, $error) = check_structure(get_structure($git, 'file'), [split '/', "/$file"]);
         unless ($code) {
-            $git->error($PKG, "$error: $file\n");
+            $git->error($PKG, "$error: $file");
             $errors++;
         }
     }
@@ -135,7 +135,7 @@ sub check_ref {
     if (my $structure = get_structure($git, 'ref')) {
         if ($old_commit eq '0' x 40) {
             check_structure($structure, [split '/', "/$ref"])
-                or $git->error($PKG, "reference name '$ref' not allowed\n")
+                or $git->error($PKG, "reference name '$ref' not allowed")
                     and $errors++;
         }
     }
@@ -177,6 +177,7 @@ UPDATE           \&check_affected_refs;
 PRE_RECEIVE      \&check_affected_refs;
 REF_UPDATE       \&check_affected_refs;
 PATCHSET_CREATED \&check_commit;
+DRAFT_PUBLISHED  \&check_commit;
 
 1;
 
@@ -192,7 +193,7 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.048
+version 0.049
 
 =head1 DESCRIPTION
 
