@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.049';
+  $Git::Hooks::CheckStructure::VERSION = '0.050';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -23,14 +23,19 @@ my $PKG = __PACKAGE__;
 sub get_structure {
     my ($git, $what) = @_;
 
-    if (my $value = $git->get_config($CFG => $what)) {
-        local $@ = undef;
-        my $structure = eval {eval_gitconfig($value)};
-        die "$PKG: $@\n" if $@;
-        return $structure;
-    } else {
-        return;
+    state $cache = {};
+
+    unless (exists $cache->{$what}) {
+        if (my $value = $git->get_config($CFG => $what)) {
+            local $@ = undef;
+            $cache->{$what} = eval {eval_gitconfig($value)};
+            die "$PKG: $@\n" if $@;
+        } else {
+            $cache->{$what} = undef;
+        }
     }
+
+    return $cache->{$what};
 }
 
 sub check_array_structure {
@@ -193,7 +198,7 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.049
+version 0.050
 
 =head1 DESCRIPTION
 

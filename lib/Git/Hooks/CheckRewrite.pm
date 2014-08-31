@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckRewrite;
 {
-  $Git::Hooks::CheckRewrite::VERSION = '0.049';
+  $Git::Hooks::CheckRewrite::VERSION = '0.050';
 }
 # ABSTRACT: Git::Hooks plugin for checking against unsafe rewrites
 
@@ -61,7 +61,7 @@ sub check_commit_amend {
     my $record_file = _record_filename($git);
 
     -r $record_file
-        or $git->error($PKG, "Can't read $record_file. You probably forgot to symlink the pre-commit hook.")
+        or $git->error($PKG, "cannot read $record_file. You probably forgot to symlink the pre-commit hook")
             and return 0;
 
     my ($old_commit, $old_parents) = read_file($record_file);
@@ -87,7 +87,7 @@ sub check_commit_amend {
         # $old_commit is reachable by at least one branch, which means
         # the amend was unsafe.
         my $branches = join "\n    ", @branches;
-        $git->error($PKG, "Unsafe commit", <<"EOF");
+        $git->error($PKG, "unsafe commit", <<"EOF");
 You've just performed un unsafe "git commit --amend" because your
 original HEAD ($old_commit) is still reachable by the following
 branch(es):
@@ -136,7 +136,7 @@ sub check_rebase {
         # The base commit is reachable by more than one branch, which
         # means the rewrite is unsafe.
         my $branches = join("\n    ", grep {$_ ne $branch} @branches);
-        $git->error($PKG, "Unsafe rebase", <<"EOF");
+        $git->error($PKG, "unsafe rebase", <<"EOF");
 This is an unsafe rebase because it would rewrite commits shared by
 $branch and the following other branch(es):
 
@@ -167,7 +167,7 @@ Git::Hooks::CheckRewrite - Git::Hooks plugin for checking against unsafe rewrite
 
 =head1 VERSION
 
-version 0.049
+version 0.050
 
 =head1 DESCRIPTION
 

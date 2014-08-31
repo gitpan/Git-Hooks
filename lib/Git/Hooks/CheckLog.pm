@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckLog;
 {
-  $Git::Hooks::CheckLog::VERSION = '0.049';
+  $Git::Hooks::CheckLog::VERSION = '0.050';
 }
 # ABSTRACT: Git::Hooks plugin to enforce commit log policies.
 
@@ -52,7 +52,7 @@ sub _spell_checker {
 
     unless (state $tried_to_check) {
         unless (eval { require Text::SpellChecker; }) {
-            $git->error($PKG, "Could not require Text::SpellChecker module to spell messages", $@);
+            $git->error($PKG, "could not require Text::SpellChecker module to spell messages", $@);
             return;
         }
 
@@ -67,7 +67,7 @@ sub _spell_checker {
 
         my $word = eval { $checker->next_word(); };
         length $@
-            and $git->error($PKG, "Cannot spell check using Text::SpellChecker", $@)
+            and $git->error($PKG, "cannot spell check using Text::SpellChecker", $@)
                 and return;
 
         $tried_to_check = 1;
@@ -91,11 +91,9 @@ sub check_spelling {
 
     foreach my $badword ($checker->next_word()) {
         my @suggestions = $checker->suggestions($badword);
-        $git->error(
-            $PKG,
-            "$id\'s log has a misspelled word: '$badword'",
-            defined $suggestions[0] ? "suggestions: " . join(', ', @suggestions) : undef,
-        );
+        $git->error($PKG, "commit $id log has a misspelled word: '$badword'",
+                    defined $suggestions[0] ? "suggestions: " . join(', ', @suggestions) : undef,
+                );
     }
 
     return $errors == 0;
@@ -109,11 +107,11 @@ sub check_patterns {
     foreach my $match ($git->get_config($CFG => 'match')) {
         if ($match =~ s/^!\s*//) {
             $msg !~ /$match/m
-                or $git->error($PKG, "$id\'s log SHOULD NOT match '\Q$match\E'")
+                or $git->error($PKG, "commit $id log SHOULD NOT match '\Q$match\E'")
                     and $errors++;
         } else {
             $msg =~ /$match/m
-                or $git->error($PKG, "$id\'s log SHOULD match '\Q$match\E'")
+                or $git->error($PKG, "commit $id log SHOULD match '\Q$match\E'")
                     and $errors++;
         }
     }
@@ -128,11 +126,11 @@ sub check_title {
         or return 1;
 
     defined $title
-        or $git->error($PKG, "$id\'s log needs a title line")
+        or $git->error($PKG, "commit $id log needs a title line")
             and return 0;
 
     ($title =~ tr/\n/\n/) == 1
-        or $git->error($PKG, "$id\'s log title should have just one line")
+        or $git->error($PKG, "commit $id log title should have just one line")
             and return 0;
 
     my $errors = 0;
@@ -140,21 +138,21 @@ sub check_title {
     if (my $max_width = $git->get_config($CFG => 'title-max-width')) {
         my $tlen = length($title) - 1; # discount the newline
         $tlen <= $max_width
-            or $git->error($PKG, "$id\'s log title should be at most $max_width characters wide, but it has $tlen")
+            or $git->error($PKG, "commit $id log title should be at most $max_width characters wide, but it has $tlen")
                 and $errors++;
     }
 
     if (my $period = $git->get_config($CFG => 'title-period')) {
         if ($period eq 'deny') {
             $title !~ /\.$/
-                or $git->error($PKG, "$id\'s log title SHOULD NOT end in a period")
+                or $git->error($PKG, "commit $id log title SHOULD NOT end in a period")
                     and $errors++;
         } elsif ($period eq 'require') {
             $title =~ /\.$/
-                or $git->error($PKG, "$id\'s log title SHOULD end in a period")
+                or $git->error($PKG, "commit $id log title SHOULD end in a period")
                     and $errors++;
         } elsif ($period ne 'allow') {
-            $git->error($PKG, "Invalid value for the $CFG.title-period option: '$period'")
+            $git->error($PKG, "invalid value for the $CFG.title-period option: '$period'")
                 and $errors++;
         }
     }
@@ -170,7 +168,7 @@ sub check_body {
     if (my $max_width = $git->get_config($CFG => 'body-max-width')) {
         if (my @biggies = ($body =~ /^(.{$max_width,})/gm)) {
             my $aremany = (@biggies == 1 ? "is " : "are ") . scalar(@biggies);
-            $git->error($PKG, "$id\'s log body lines should be at most $max_width characters wide, "
+            $git->error($PKG, "commit $id log body lines should be at most $max_width characters wide, "
                             . "but there $aremany bigger than that in it");
             return 0;
         }
@@ -184,7 +182,7 @@ sub check_message {
 
     # assert(defined $msg)
 
-    my $id = defined $commit ? substr($commit->{commit}, 0, 7) : 'commit';
+    my $id = defined $commit ? substr($commit->{commit}, 0, 7) : '';
 
     my $errors = 0;
 
@@ -220,7 +218,7 @@ sub check_message_file {
     my $msg = eval {$git->read_commit_msg_file($commit_msg_file)};
 
     unless (defined $msg) {
-        $git->error($PKG, "Cannot read commit message file '$commit_msg_file'", $@);
+        $git->error($PKG, "cannot read commit message file '$commit_msg_file'", $@);
         return 0;
     }
 
@@ -280,7 +278,7 @@ Git::Hooks::CheckLog - Git::Hooks plugin to enforce commit log policies.
 
 =head1 VERSION
 
-version 0.049
+version 0.050
 
 =head1 DESCRIPTION
 

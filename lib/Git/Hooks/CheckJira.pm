@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '0.049';
+  $Git::Hooks::CheckJira::VERSION = '0.050';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -72,7 +72,7 @@ sub _jira {
         my %jira;
         for my $option (qw/jiraurl jirauser jirapass/) {
             $jira{$option} = $git->get_config($CFG => $option)
-                or $git->error($PKG, "Missing $CFG.$option configuration attribute")
+                or $git->error($PKG, "missing $CFG.$option configuration attribute")
                     and return;
         }
         $jira{jiraurl} =~ s:/+$::; # trim trailing slashes from the URL
@@ -142,11 +142,22 @@ sub check_codes {
     return @codes;
 }
 
-sub _check_jira_keys {
+sub _check_jira_keys {          ## no critic (ProhibitExcessComplexity)
     my ($git, $commit, $ref, @keys) = @_;
+
+    unless (@keys) {
+        if ($git->get_config($CFG => 'require')) {
+            my $shortid = exists $commit->{commit} ? substr($commit->{commit}, 0, 8) : '';
+            $git->error($PKG, "commit $shortid must cite a JIRA in its message");
+            return 0;
+        } else {
+            return 1;
+        }
+    }
 
     my @issues;
 
+    my %projects    = map {($_ => undef)} $git->get_config($CFG => 'project');
     my $unresolved  = $git->get_config($CFG => 'unresolved');
     my $by_assignee = $git->get_config($CFG => 'by-assignee');
 
@@ -154,6 +165,12 @@ sub _check_jira_keys {
 
   KEY:
     foreach my $key (@keys) {
+        not %projects
+            or $key =~ /([^-]+)/ and exists $projects{$1}
+                or $git->error($PKG, "do not cite issue $key. This repository accepts only issues from: "
+                                   . join(' ', sort keys %projects))
+                    and next KEY;
+
         my $issue = get_issue($git, $key)
             or $errors++
                 and next KEY;
@@ -186,7 +203,7 @@ sub _check_jira_keys {
         if (defined $ok) {
             $errors++ unless $ok;
         } elsif (length $@) {
-            $git->error($PKG, "Error while evaluating check-code: $@\n");
+            $git->error($PKG, "error while evaluating check-code: $@");
             $errors++;
         }
     }
@@ -197,39 +214,7 @@ sub _check_jira_keys {
 sub check_commit_msg {
     my ($git, $commit, $ref) = @_;
 
-    my @keys  = uniq(grok_msg_jiras($git, $commit->{body}));
-    my $nkeys = @keys;
-
-    # Filter out JIRAs not belonging to any of the specific projects,
-    # if any. We don't care about them.
-    if ($nkeys) {
-        if (my @projects = $git->get_config($CFG => 'project')) {
-            my %projects = map {($_ => undef)} @projects;
-            @keys = grep {/([^-]+)/ && exists $projects{$1}} @keys;
-        }
-    }
-
-    unless (@keys) {
-        if ($git->get_config($CFG => 'require')) {
-            my $shortid = exists $commit->{commit} ? substr($commit->{commit}, 0, 8) : '';
-            my $in_ref  = $ref || "with no ref pointing to it";
-            if (@keys == $nkeys) {
-                $git->error($PKG, "commit $shortid ($in_ref) does not cite any JIRA in its message.\n");
-                return 0;
-            } else {
-                my $projects = join(' ', $git->get_config($CFG => 'project'));
-                $git->error($PKG, <<"EOF");
-commit $shortid ($in_ref) does not cite any JIRA from the expected
-projects ($projects) in its message.
-EOF
-                return 0;
-            }
-        } else {
-            return 1;
-        }
-    }
-
-    return _check_jira_keys($git, $commit, $ref, @keys);
+    return _check_jira_keys($git, $commit, $ref, uniq(grok_msg_jiras($git, $commit->{body})));
 }
 
 sub check_patchset {
@@ -252,7 +237,7 @@ sub check_message_file {
     return 1 unless is_ref_enabled($current_branch, $git->get_config($CFG => 'ref'));
 
     my $msg = read_file($commit_msg_file)
-        or $git->error($PKG, "Can't open file '$commit_msg_file' for reading: $!\n")
+        or $git->error($PKG, "cannot open file '$commit_msg_file' for reading: $!")
             and return 0;
 
     # Remove comment lines from the message file contents.
@@ -325,7 +310,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 0.049
+version 0.050
 
 =head1 DESCRIPTION
 
@@ -475,12 +460,15 @@ regexes are tried and JIRA keys are looked for in all of them. This
 allows you to more easily accomodate more than one way of specifying
 JIRA keys if you wish.
 
-=head2 githooks.checkjira.project STRING
+=head2 githooks.checkjira.project KEY
 
 By default, the committer can reference any JIRA issue in the commit
 log. You can restrict the allowed keys to a set of JIRA projects by
-specifying a JIRA project key to this option. You can enable more than
-one project by specifying more than one value to this option.
+specifying a JIRA project key to this option. You can allow more than one
+project by specifying this option multiple times, once per project key.
+
+If you set this option, then any cited JIRA issue that doesn't belong to one
+of the specified projects causes an error.
 
 =head2 githooks.checkjira.require [01]
 

@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckAcls;
 {
-  $Git::Hooks::CheckAcls::VERSION = '0.049';
+  $Git::Hooks::CheckAcls::VERSION = '0.050';
 }
 # ABSTRACT: Git::Hooks plugin for branch/tag access control.
 
@@ -75,7 +75,7 @@ sub check_ref {
         next unless match_user($git, $who);
         next unless match_ref($ref, $refspec);
         if ($what =~ /[^CRUD-]/) {
-            $git->error($PKG, "Invalid acl 'what' component: '$what'");
+            $git->error($PKG, "invalid acl 'what' component: '$what'");
             return 0;
         }
         return 1 if index($what, $op) != -1;
@@ -90,9 +90,9 @@ sub check_ref {
     );
 
     if (my $myself = eval { $git->authenticated_user() }) {
-        $git->error($PKG, "You ($myself) cannot $op{$op} ref $ref");
+        $git->error($PKG, "you ($myself) cannot $op{$op} ref $ref");
     } else {
-        $git->error($PKG, "Cannot grok authenticated username", $@);
+        $git->error($PKG, "cannot grok authenticated username", $@);
     }
 
     return 0;
@@ -130,7 +130,7 @@ Git::Hooks::CheckAcls - Git::Hooks plugin for branch/tag access control.
 
 =head1 VERSION
 
-version 0.049
+version 0.050
 
 =head1 DESCRIPTION
 
