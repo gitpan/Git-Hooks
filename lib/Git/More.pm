@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '0.050';
+  $Git::More::VERSION = '0.051';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -120,6 +120,26 @@ sub get_config {
     unless (exists $git->{more}{config}) {
         my %config;
 
+        exists $ENV{HOME}
+            or die __PACKAGE__, <<'EOT';
+The HOME environment variable is undefined.
+
+We need it to read Git's global configuration from $HOME/.gitconfig.
+
+If you really don't want to read the global configuration, define HOME as an
+empty string in your hook script like this before invoking run_hook():
+
+  $ENV{HOME} = '';
+
+Note that if you're using Gerrit as a Git server it runs with HOME undefined
+by default when started by a boot script. In this case you should define
+HOME in your hook script to point to the directory holding your .gitconfig
+file. For example:
+
+  $ENV{HOME} = '/home/gerrit';
+
+EOT
+
         my $config = do {
            local $/ = "\c@";
            $git->command(config => '--null', '--list');
@@ -176,6 +196,33 @@ sub clean_cache {
     my ($git, $section) = @_;
     delete $git->{more}{cache}{$section};
     return;
+}
+
+sub get_commit {
+    my ($git, $commit) = @_;
+
+    local $/ = "\c@\cJ";
+    my ($pipe, $ctx) = $git->command_output_pipe(
+        'rev-list',
+        '--no-walk',
+    # See 'git help rev-list' to understand the --pretty argument
+        '--pretty=format:%H%n%T%n%P%n%aN%n%aE%n%ai%n%cN%n%cE%n%ci%n%s%n%n%b%x00',
+        $commit,
+    );
+
+    my $commit_hash;
+    while (<$pipe>) {
+            my %commit;
+            @commit{qw/header commit tree parent
+                       author_name author_email author_date
+                       commmitter_name committer_email committer_date
+                       body/} = split "\cJ", $_, 11;
+            $commit_hash = \%commit;
+    }
+
+    $git->command_close_pipe($pipe, $ctx);
+
+    return $commit_hash;
 }
 
 sub get_commits {
@@ -489,7 +536,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 0.050
+version 0.051
 
 =head1 SYNOPSIS
 
@@ -628,6 +675,27 @@ This method deletes the cache entry for SECTION. It may be used by
 hooks just before returning to B<Git::Hooks::run_hooks> in order to
 get rid of any value kept in the SECTION's cache.
 
+=head2 get_commit COMMIT
+
+This method returns a hash representing COMMIT. It obtains this information
+by invoking C<git rev-list --no-walk COMMIT>.
+
+The returned hash has the following structure (the codes are explained in
+the C<git help rev-list> document):
+
+    {
+        commit          => %H:  commit hash
+        tree            => %T:  tree hash
+        parent          => %P:  parent hashes (space separated)
+        author_name     => %aN: author name
+        author_email    => %aE: author email
+        author_date     => %ai: author date in ISO8601 format
+        commmitter_name => %cN: committer name
+        committer_email => %cE: committer email
+        committer_date  => %ci: committer date in ISO8601 format
+        body            => %B:  raw body (aka commit message)
+    }
+
 =head2 get_commits OLDCOMMIT NEWCOMMIT
 
 This method returns a list of hashes representing every commit
@@ -648,23 +716,6 @@ syntax for this is NEWCOMMIT ^B1 ^B2 ... ^Bn", i.e., NEWCOMMIT
 followed by every other branch name prefixed by carets. We can get at
 their names using the technique described in, e.g., L<this
 discussion|http://stackoverflow.com/questions/3511057/git-receive-update-hooks-and-new-branches>.
-
-Each commit in the returned list is represented by a hash with the
-following structure (the codes are explained in the C<git help
-rev-list> document):
-
-    {
-        commit          => %H:  commit hash
-        tree            => %T:  tree hash
-        parent          => %P:  parent hashes (space separated)
-        author_name     => %aN: author name
-        author_email    => %aE: author email
-        author_date     => %ai: author date in ISO8601 format
-        commmitter_name => %cN: committer name
-        committer_email => %cE: committer email
-        committer_date  => %ci: committer date in ISO8601 format
-        body            => %B:  raw body (aka commit message)
-    }
 
 =head2 get_commit_msg COMMIT_ID
 

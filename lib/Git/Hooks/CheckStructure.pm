@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.050';
+  $Git::Hooks::CheckStructure::VERSION = '0.051';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -198,7 +198,7 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.050
+version 0.051
 
 =head1 DESCRIPTION
 

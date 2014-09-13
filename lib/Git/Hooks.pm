@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.050';
+  $Git::Hooks::VERSION = '0.051';
 }
 # ABSTRACT: Framework for implementing Git (and Gerrit) hooks
 
@@ -120,6 +120,11 @@ sub spawn_external_hook {
         return spawn_external_hook_with_feed($git, $file, $hook, $stdin, @args);
 
     } else {
+
+        if (@args && ref $args[0]) {
+            # This is a Gerrit hook and we need to expand its arguments
+            @args = %{$args[0]};
+        }
 
         my $exit = system {$file} ($hook, @args);
 
@@ -601,7 +606,7 @@ Git::Hooks - Framework for implementing Git (and Gerrit) hooks
 
 =head1 VERSION
 
-version 0.050
+version 0.051
 
 =head1 SYNOPSIS
 
@@ -998,6 +1003,15 @@ invoked to grok all configuration affecting the current
 repository. Note that this will fetch all C<--system>, C<--global>,
 and C<--local> options, in this order. You may use this mechanism to
 define configuration global to a user or local to a repository.
+
+Gerrit keeps its repositories in a hierarchy and its specific configuration
+mechanism takes advantage of that to allow a configuration definition in a
+parent repository to trickle down to its children repositories. Git::Hooks
+uses Git's native configuration mechanisms and doesn't support Gerrit's
+mechanism, which is based on configuration files kept in a dettached
+C<refs/meta/config> branch. But you can implement a hierarchy of
+configuration files by using Git's inclusion mechanism. Please, read the
+"Includes" section of C<git help config> to know how.
 
 =head2 githooks.plugin PLUGIN...
 

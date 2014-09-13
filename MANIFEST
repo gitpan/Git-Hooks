@@ -10,7 +10,6 @@ TODO.pod
 TUTORIAL.pod
 dist.ini
 lib/Git/Hooks.pm
-lib/Git/Hooks.pm.orig
 lib/Git/Hooks/CheckAcls.pm
 lib/Git/Hooks/CheckJira.pm
 lib/Git/Hooks/CheckLog.pm
