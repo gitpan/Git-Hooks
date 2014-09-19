@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '0.051';
+  $Git::Hooks::VERSION = '0.052';
 }
 # ABSTRACT: Framework for implementing Git (and Gerrit) hooks
 
@@ -10,6 +10,7 @@ use warnings;
 use Exporter qw/import/;
 use Data::Util qw(:all);
 use File::Slurp;
+use File::Temp qw/tempfile/;
 use File::Basename;
 use File::Spec::Functions;
 use List::MoreUtils qw/uniq/;
@@ -42,8 +43,8 @@ BEGIN {                ## no critic (Subroutines::RequireArgUnpacking)
 
     @EXPORT      = (@installers, 'run_hook');
 
-    @EXPORT_OK = qw/is_ref_enabled im_memberof match_user im_admin
-                    eval_gitconfig post_hook/;
+    @EXPORT_OK = qw/is_ref_enabled im_memberof match_user im_admin file_temp
+                    eval_gitconfig post_hook redirect_output restore_output/;
 
     %EXPORT_TAGS = (utils => \@EXPORT_OK);
 }
@@ -77,31 +78,33 @@ sub is_ref_enabled {
     return 0;
 }
 
-# This is an internal routine used to invoke external hooks which need
-# to be fed information via STDIN.
+# The routine redirect_output redirects STDOUT and STDERR to a temporary
+# file and returns a reference that should be passed to the routine
+# restore_output to restore the handles to their original state.
 
-sub spawn_external_hook_with_feed {
-    my ($git, $file, $hook, $stdin, @args) = @_;
+sub redirect_output {
+    ## no critic (RequireBriefOpen, RequireCarping)
+    open(my $oldout, '>&', \*STDOUT)  or die "Can't dup STDOUT: $!";
+    open(my $olderr, '>&', \*STDERR)  or die "Can't dup STDERR: $!";
+    my ($tempfh, $tempfile) = tempfile(UNLINK => 1);
+    open(STDOUT    , '>' , $tempfile) or die "Can't redirect STDOUT to \$tempfile: $!";
+    open(STDERR    , '>&', \*STDOUT)  or die "Can't dup STDOUT for STDERR: $!";
+    ## use critic
+    return [$oldout, $olderr, $tempfile];
+}
 
-    my $pid = open my $pipe, '|-'; ## no critic (InputOutput::RequireBriefOpen)
+# This routine gets a reference returned by redirect_output, restores STDOUT
+# and STDERR to their previous state and returns a string containing every
+# output since the previous call to redirect_output.
 
-    if (! defined $pid) {
-        die __PACKAGE__, ": can't fork: $!\n";
-    } elsif ($pid) {
-        # parent
-        print $pipe $stdin;
-        if (close $pipe) {
-            return 1;
-        } elsif ($!) {
-            die __PACKAGE__, ": Error closing pipe to external hook '$file': $!\n";
-        } else {
-            die __PACKAGE__, ": External hook '$file' exited with $?\n";
-        }
-    } else {
-        # child
-        exec {$file} ($hook, @args);
-        die __PACKAGE__, ": can't exec: $!\n";
-    }
+sub restore_output {
+    my ($saved) = @_;
+    my ($oldout, $olderr, $tempfile) = @$saved;
+    ## no critic (RequireCarping)
+    open(STDOUT, '>&', $oldout) or die "Can't dup \$oldout: $!";
+    open(STDERR, '>&', $olderr) or die "Can't dup \$olderr: $!";
+    ## use critic
+    return read_file($tempfile);
 }
 
 # This is an internal routine used to invoke external hooks, feed them
@@ -110,6 +113,9 @@ sub spawn_external_hook_with_feed {
 sub spawn_external_hook {
     my ($git, $file, $hook, @args) = @_;
 
+    my $prefix  = '[' . __PACKAGE__ . '(' . basename($file) . ')]';
+    my $saved_output = redirect_output();
+
     if ($hook =~ /^(?:pre-receive|post-receive|pre-push|post-rewrite)$/) {
 
         # These hooks receive information via STDIN that we read once
@@ -117,7 +123,31 @@ sub spawn_external_hook {
         # information and output it to the external hooks we invoke.
 
         my $stdin = join("\n", map {join(' ', @$_)} @{$git->get_input_data}) . "\n";
-        return spawn_external_hook_with_feed($git, $file, $hook, $stdin, @args);
+
+        my $pid = open my $pipe, '|-'; ## no critic (InputOutput::RequireBriefOpen)
+
+        if (! defined $pid) {
+            restore_output($saved_output);
+            $git->error($prefix, "can't fork: $!");
+        } elsif ($pid) {
+            # parent
+            print $pipe $stdin;
+            my $exit = close $pipe;
+            my $output = restore_output($saved_output);
+            if ($exit) {
+                warn $output, "\n" if length $output;
+                return 1;
+            } elsif ($!) {
+                $git->error($prefix, "Error closing pipe to external hook: $!", $output);
+            } else {
+                $git->error($prefix, "External hook exited with code $?", $output);
+            }
+        } else {
+            # child
+            { exec {$file} ($hook, @args) };
+            restore_output($saved_output);
+            die "$prefix: can't exec: $!\n";
+        }
 
     } else {
 
@@ -128,20 +158,62 @@ sub spawn_external_hook {
 
         my $exit = system {$file} ($hook, @args);
 
+        my $output = restore_output($saved_output);
+
         if ($exit == 0) {
+            warn $output, "\n" if length $output;
             return 1;
-        } elsif ($exit == -1) {
-            $git->error(__PACKAGE__, ": failed to execute '$file'", $!);
-        } elsif ($exit & 127) {
-            $git->error(__PACKAGE__, sprintf("'$file' died with signal %d, %s coredump",
-                                             ($exit & 127), ($exit & 128) ? 'with' : 'without'));
         } else {
-            $git->error(__PACKAGE__, sprintf("'$file' exited abnormally with value %d", $exit >> 8));
+            my $message = do {
+                if ($exit == -1) {
+                    "failed to execute external hook: $!";
+                } elsif ($exit & 127) {
+                    sprintf("external hook died with signal %d, %s coredump",
+                            ($exit & 127), ($exit & 128) ? 'with' : 'without');
+                } else {
+                    sprintf("'$file' exited abnormally with value %d", $exit >> 8);
+                }
+            };
+            $git->error($prefix, $message, $output);
         }
-
-        return 0;
-
     }
+
+    return 0;
+}
+
+sub file_temp {
+    my ($git, $rev, $file, @args) = @_;
+
+    state $cache = {};
+
+    my $blob = "$rev:$file";
+
+    unless (exists $cache->{$blob}) {
+        # create temporary file and copy contents to it
+        my $tmp = File::Temp->new(@args);
+        my ($pipe, $ctx) = $git->command_output_pipe(qw/cat-file blob/, $blob);
+        my $read;
+        while ($read = sysread $pipe, my $buffer, 64 * 1024) {
+            my $length = length $buffer;
+            my $offset = 0;
+            while ($length) {
+                my $written = syswrite $tmp, $buffer, $length, $offset;
+                defined $written
+                    or $git->error(__PACKAGE__, "Internal error: can't write to '$tmp->filename()': $!")
+                        and return;
+                $length -= $written;
+                $offset += $written;
+            }
+        }
+        defined $read
+            or $git->error(__PACKAGE__, "Internal error: can't read from git cat-file pipe: $!")
+                and return;
+        $git->command_close_pipe($pipe, $ctx);
+        $tmp->close();
+        $cache->{$blob} = $tmp;
+    }
+
+    return $cache->{$blob};
 }
 
 sub grok_groups_spec {
@@ -606,7 +678,7 @@ Git::Hooks - Framework for implementing Git (and Gerrit) hooks
 
 =head1 VERSION
 
-version 0.051
+version 0.052
 
 =head1 SYNOPSIS
 
@@ -638,7 +710,7 @@ options. (More on this later.)
 
         run_hook($0, @ARGV);
 
-=for Pod::Coverage spawn_external_hook_with_feed spawn_external_hook grok_groups_spec grok_groups
+=for Pod::Coverage spawn_external_hook grok_groups_spec grok_groups
 
 =head1 INTRODUCTION
 
@@ -857,6 +929,11 @@ own documentation for more details.
 Allow you to specify Access Control Lists to tell who can commit or
 push to the repository and affect which Git refs.
 
+=item * Git::Hooks::CheckFile
+
+Check if the contents of newly added or modified files comply with specified
+policies.
+
 =item * Git::Hooks::CheckJira
 
 Integrate Git with the L<JIRA|http://www.atlassian.com/software/jira/>
@@ -876,9 +953,9 @@ already pushed.
 
 =item * Git::Hooks::CheckStructure
 
-Check if newly added files and references (branches and tags) comply
-with specified policies, so that you can impose a strict structure to
-the repository's file and reference hierarchies.
+Check if newly added files and reference names (branches and tags) comply
+with specified policies, so that you can impose a strict structure to the
+repository's file and reference hierarchies.
 
 =item * Git::Hooks::GerritChangeId
 
@@ -1524,6 +1601,36 @@ C<VALUE> is a string beginning with C<file:>, the remaining of it is
 treated as a file name which contents are evaluated as Perl code and
 the resulting value is returned. Otherwise, C<VALUE> itself is
 returned.
+
+=head2 redirect_output
+
+This routine redirects STDOUT and STDERR to a temporary file and returns a
+reference that should be passed to the routine C<restore_output> to restore
+the handles to their original state.
+
+=head2 restore_output REF
+
+This routine gets a reference returned by C<redirect_output>, restores
+STDOUT and STDERR to their previous state and returns a string containing
+every output since the previous call to redirect_output.
+
+=head2 file_temp REV, FILE, ARGS...
+
+This routine returns a C<File::Temp> object representing a temporary file
+into which the contents of the file FILE in revision REV has been copied.
+
+The object's filehandle is closed before being returned.
+
+It's useful for hooks that need to read the contents of changed files in
+order to check anything in them.
+
+These objects are cached so that if more than one hook needs to get at them
+they're created only once.
+
+By default, all temporary files are removed when the hook exits.
+
+Any remaining ARGS are passed as arguments to C<File::Temp::new> so that you
+can have more control over the temporary file creation.
 
 =head1 SEE ALSO
 

@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckStructure;
 {
-  $Git::Hooks::CheckStructure::VERSION = '0.051';
+  $Git::Hooks::CheckStructure::VERSION = '0.052';
 }
 # ABSTRACT: Git::Hooks plugin for ref/file structure validation.
 
@@ -111,11 +111,11 @@ sub check_structure {
 }
 
 sub check_added_files {
-    my ($git, $files) = @_;
+    my ($git, @files) = @_;
 
     my $errors = 0;
 
-    foreach my $file (sort keys %$files) {
+    foreach my $file (@files) {
         # Split the $file path in its components. We prefix $file with
         # a slash to make it look like an absolute path for
         # check_structure.
@@ -147,7 +147,7 @@ sub check_ref {
 
     # Check names of newly added files
     if (get_structure($git, 'file')) {
-        check_added_files($git, $git->get_diff_files('--diff-filter=A', $old_commit, $new_commit))
+        check_added_files($git, $git->filter_files_in_range('A', $old_commit, $new_commit))
             or $errors++;
     }
 
@@ -173,7 +173,15 @@ sub check_affected_refs {
 sub check_commit {
     my ($git) = @_;
 
-    return check_added_files($git, $git->get_diff_files('--diff-filter=A', '--cached'));
+    return check_added_files($git, $git->filter_files_in_index('A'));
+}
+
+sub check_patchset {
+    my ($git, $opts) = @_;
+
+    return 1 if im_admin($git);
+
+    return check_added_files($git, $git->filter_files_in_commit('A', $opts->{'--commit'}));
 }
 
 # Install hooks
@@ -181,8 +189,8 @@ PRE_COMMIT       \&check_commit;
 UPDATE           \&check_affected_refs;
 PRE_RECEIVE      \&check_affected_refs;
 REF_UPDATE       \&check_affected_refs;
-PATCHSET_CREATED \&check_commit;
-DRAFT_PUBLISHED  \&check_commit;
+PATCHSET_CREATED \&check_patchset;
+DRAFT_PUBLISHED  \&check_patchset;
 
 1;
 
@@ -198,7 +206,7 @@ Git::Hooks::CheckStructure - Git::Hooks plugin for ref/file structure validation
 
 =head1 VERSION
 
-version 0.051
+version 0.052
 
 =head1 DESCRIPTION
 
@@ -424,6 +432,12 @@ C<pre-receive> hooks. It needs a C<Git::More> object.
 
 This is the routine used to implement the C<pre-commit>. It needs a
 C<Git::More> object.
+
+=head2 check_patchset GIT, OPTS
+
+This is the routine used to implement the C<patchset-created> and the
+C<draft-published> hooks. It needs a C<Git::More> object and a hash
+containing the parameters passed by Gerrit.
 
 =head2 check_structure STRUCTURE, PATH
 

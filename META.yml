@@ -39,6 +39,7 @@ requires:
   File::Temp: 0
   Gerrit::REST: 0
   List::MoreUtils: 0
+  Text::Glob: 0
   parent: 0
   perl: 5.010
   strict: 0
@@ -47,4 +48,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 0.051
+version: 0.052

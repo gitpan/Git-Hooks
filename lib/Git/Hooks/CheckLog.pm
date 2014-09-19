@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckLog;
 {
-  $Git::Hooks::CheckLog::VERSION = '0.051';
+  $Git::Hooks::CheckLog::VERSION = '0.052';
 }
 # ABSTRACT: Git::Hooks plugin to enforce commit log policies.
 
@@ -166,10 +166,13 @@ sub check_body {
     return 1 unless defined $body && length $body;
 
     if (my $max_width = $git->get_config($CFG => 'body-max-width')) {
-        if (my @biggies = ($body =~ /^(.{$max_width,})/gm)) {
-            my $aremany = (@biggies == 1 ? "is " : "are ") . scalar(@biggies);
-            $git->error($PKG, "commit $id log body lines should be at most $max_width characters wide, "
-                            . "but there $aremany bigger than that in it");
+        my $toobig = $max_width + 1;
+        if (my @biggies = ($body =~ /^(.{$toobig,})/gm)) {
+            my $theseare = @biggies == 1 ? "this is" : "these are";
+            $git->error($PKG,
+                        "commit $id log body lines should be at most $max_width characters wide, but $theseare bigger",
+                        join("\n", @biggies),
+                    );
             return 0;
         }
     }
@@ -278,7 +281,7 @@ Git::Hooks::CheckLog - Git::Hooks plugin to enforce commit log policies.
 
 =head1 VERSION
 
-version 0.051
+version 0.052
 
 =head1 DESCRIPTION
 

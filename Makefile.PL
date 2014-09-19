@@ -145,6 +145,7 @@ my %WriteMakefileArgs = (
     'File::Temp' => '0',
     'Gerrit::REST' => '0',
     'List::MoreUtils' => '0',
+    'Text::Glob' => '0',
     'parent' => '0',
     'strict' => '0',
     'utf8' => '0',
@@ -159,7 +160,7 @@ my %WriteMakefileArgs = (
     'URI::file' => '0',
     'lib' => '0'
   },
-  'VERSION' => '0.051',
+  'VERSION' => '0.052',
   'test' => {
     'TESTS' => 't/*.t'
   },
