@@ -160,7 +160,7 @@ my %WriteMakefileArgs = (
     'URI::file' => '0',
     'lib' => '0'
   },
-  'VERSION' => '0.052',
+  'VERSION' => '1.0.0',
   'test' => {
     'TESTS' => 't/*.t'
   },

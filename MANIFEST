@@ -6,7 +6,6 @@ MANIFEST.SKIP
 META.yml
 Makefile.PL
 README
-TODO.pod
 TUTORIAL.pod
 dist.ini
 lib/Git/Hooks.pm
