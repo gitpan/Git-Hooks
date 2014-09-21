@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '1.0.0';
+  $Git::More::VERSION = '1.0.1';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -147,7 +147,7 @@ sub get_commits {
     # the hooks usually don't need to check them. So, in this
     # situation we simply return an empty list of commits.
 
-    return () if $new_commit eq '0' x 40;
+    return if $new_commit eq '0' x 40;
 
     # When a new branch is created $old_commit is null (i.e.,
     # '0'x40). In this case we want all commits reachable from
@@ -308,8 +308,10 @@ sub set_affected_ref {
 sub _get_affected_refs_hash {
     my ($git) = @_;
 
-    return $git->{more}{affected_refs}
+    $git->{more}{affected_refs}
         or die __PACKAGE__, ": get_affected_refs(): no affected refs set\n";
+
+    return $git->{more}{affected_refs};
 }
 
 sub get_affected_refs {
@@ -439,11 +441,8 @@ sub error {
 
 sub get_errors {
     my ($git) = @_;
-    if (exists $git->{more}{errors}) {
-        return @{$git->{more}{errors}};
-    } else {
-        return ();
-    }
+
+    return exists $git->{more}{errors} ? @{$git->{more}{errors}} : ();
 }
 
 sub nocarp {
@@ -467,7 +466,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 1.0.0
+version 1.0.1
 
 =head1 SYNOPSIS
 
@@ -477,7 +476,7 @@ version 1.0.0
 
     my $config  = $git->get_config();
     my $branch  = $git->get_current_branch();
-    my $commits = $git->get_commits($oldcommit, $newcommit);
+    my @commits = $git->get_commits($oldcommit, $newcommit);
     my $message = $git->get_commit_msg('HEAD');
 
     my $files_modified_by_commit = $git->filter_files_in_index('AM');

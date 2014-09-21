@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '1.0.0';
+  $Git::Hooks::VERSION = '1.0.1';
 }
 # ABSTRACT: Framework for implementing Git (and Gerrit) hooks
 
@@ -546,7 +546,7 @@ sub _load_plugins {
     my @enabled_plugins  = map {split} $git->get_config(githooks => 'plugin');
     my %disabled_plugins = map {($_ => undef)} map {split} $git->get_config(githooks => 'disable');
 
-    return () unless @enabled_plugins; # no one configured
+    return unless @enabled_plugins; # no one configured
 
     # Define the list of directories where we'll look for the hook
     # plugins. First the local directory 'githooks' under the
@@ -681,7 +681,7 @@ Git::Hooks - Framework for implementing Git (and Gerrit) hooks
 
 =head1 VERSION
 
-version 1.0.0
+version 1.0.1
 
 =head1 SYNOPSIS
 
