@@ -1,7 +1,6 @@
 use strict;
 use warnings;
 use File::Spec::Functions;
-use File::Slurp;
 
 use 5.010;
 
@@ -95,7 +94,14 @@ EOF
     foreach my $inc (@inc) {
         my $git_pm = catfile($inc, 'Git.pm');
         if (-r $git_pm) {
-            write_file(catfile(qw/t GITPERLLIB/), $inc);
+            if(open my $gitperllib_fh, '>', catfile(qw/t GITPERLLIB/)) {
+               print $gitperllib_fh $inc;
+               close $gitperllib_fh;
+            }
+            else {
+               warn "Cannot open file '" . catfile(qw/t GITPERLLIB/) . "'!\n";
+               exit 0;
+            }
             warn <<"EOF";
 Hey, you're lucky. I just found it at:
 
@@ -123,7 +129,6 @@ my %WriteMakefileArgs = (
   'AUTHOR' => 'Gustavo L. de M. Chaves <gnustavo@cpan.org>',
   'CONFIGURE_REQUIRES' => {
     'ExtUtils::MakeMaker' => '6.30',
-    'File::Slurp' => '0',
     'File::Spec::Functions' => '0',
     'strict' => '0',
     'warnings' => '0'
@@ -160,7 +165,7 @@ my %WriteMakefileArgs = (
     'URI::file' => '0',
     'lib' => '0'
   },
-  'VERSION' => '1.0.1',
+  'VERSION' => '1.0.2',
   'test' => {
     'TESTS' => 't/*.t'
   },

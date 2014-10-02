@@ -12,7 +12,6 @@ build_requires:
   lib: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.30
-  File::Slurp: 0
   File::Spec::Functions: 0
   strict: 0
   warnings: 0
@@ -48,4 +47,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 1.0.1
+version: 1.0.2
