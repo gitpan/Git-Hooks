@@ -1,20 +1,13 @@
 package Git::More;
 {
-  $Git::More::VERSION = '1.0.2';
+  $Git::More::VERSION = '1.1.0'; # TRIAL
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
 use strict;
 use warnings;
 
-BEGIN {
-    # See http://git.661346.n2.nabble.com/better-way-to-find-Git-pm-officially-td7416362.html
-    local @INC = @INC;
-    unshift @INC, split(/:/, $ENV{GITPERLLIB}) if exists $ENV{GITPERLLIB};
-    require Git;
-}
-
-use parent -norequire, 'Git';
+use parent 'Git';
 
 use Error qw(:try);
 use Carp;
@@ -466,7 +459,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 1.0.2
+version 1.1.0
 
 =head1 SYNOPSIS
 
@@ -489,33 +482,6 @@ few extra methods commonly needed by Git hook developers.
 
 In particular, it's used by the standard hooks implemented by the
 C<Git::Hooks> framework.
-
-Note that the Git module is distributed along with git and it's not on
-CPAN yet. So, it's possible that C<Git::More> can't find it in the
-default directories in @INC. You have to find it and make it available
-to your Perl in order to install Git::Hooks and to use it. Here are a
-few options to do that:
-
-=over
-
-=item * Move it to one of the directories already in @INC.
-
-=item * Add the directory where you found it to the C<PERL5LIB>
-environment variable.
-
-=item * Add the directory where you found it to the C<GITPERLLIB>
-environment variable. This method is arguably better than the previous
-one because C<GITPERLLIB> is used specifically to find C<Git.pm>
-whereas C<PERL5LIB> directories are used to find any required/used
-module in your program.
-
-=back
-
-(If you have trouble finding Git.pm, here is a tip. There are some
-Perl scripts distributed along with git that use C<Git.pm>. Take a
-look at the C<git-svn> script which should be installed in the
-directory returned by the C<git --exec-path> command. In it's second
-line there is a mention to a directory where it looks for C<Git.pm>.)
 
 =head1 METHODS
 

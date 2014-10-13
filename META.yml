@@ -12,9 +12,6 @@ build_requires:
   lib: 0
 configure_requires:
   ExtUtils::MakeMaker: 6.30
-  File::Spec::Functions: 0
-  strict: 0
-  warnings: 0
 dynamic_config: 0
 generated_by: 'Dist::Zilla version 5.008, CPAN::Meta::Converter version 2.133380'
 license: perl
@@ -37,6 +34,7 @@ requires:
   File::Spec::Functions: 0
   File::Temp: 0
   Gerrit::REST: 0
+  Git: 0
   List::MoreUtils: 0
   Text::Glob: 0
   parent: 0
@@ -47,4 +45,4 @@ requires:
 resources:
   homepage: https://metacpan.org/module/Git::Hooks
   repository: https://github.com/gnustavo/Git-Hooks.git
-version: 1.0.2
+version: 1.1.0

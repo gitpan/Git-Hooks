@@ -1,6 +1,6 @@
 package Git::More::Message;
 {
-  $Git::More::Message::VERSION = '1.0.2';
+  $Git::More::Message::VERSION = '1.1.0'; # TRIAL
 }
 # ABSTRACT: A Git commit message
 
@@ -195,7 +195,7 @@ Git::More::Message - A Git commit message
 
 =head1 VERSION
 
-version 1.0.2
+version 1.1.0
 
 =head1 SYNOPSIS
 
