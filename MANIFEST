@@ -12,7 +12,6 @@ lib/Git/Hooks.pm
 lib/Git/Hooks/CheckAcls.pm
 lib/Git/Hooks/CheckFile.pm
 lib/Git/Hooks/CheckJira.pm
-lib/Git/Hooks/CheckJira.pm.orig
 lib/Git/Hooks/CheckLog.pm
 lib/Git/Hooks/CheckRewrite.pm
 lib/Git/Hooks/CheckStructure.pm

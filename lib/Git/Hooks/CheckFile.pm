@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckFile;
 {
-  $Git::Hooks::CheckFile::VERSION = '1.2.0';
+  $Git::Hooks::CheckFile::VERSION = '1.2.1';
 }
 # ABSTRACT: Git::Hooks plugin for checking files
 
@@ -110,7 +110,7 @@ sub check_patchset {
 
     return 1 if im_admin($git);
 
-    return check_new_files($git, ':0', $git->filter_files_in_commit('AM', $opts->{'--commit'}));
+    return check_new_files($git, $opts->{'--commit'}, $git->filter_files_in_commit('AM', $opts->{'--commit'}));
 }
 
 # Install hooks
@@ -135,7 +135,7 @@ Git::Hooks::CheckFile - Git::Hooks plugin for checking files
 
 =head1 VERSION
 
-version 1.2.0
+version 1.2.1
 
 =head1 DESCRIPTION
 
