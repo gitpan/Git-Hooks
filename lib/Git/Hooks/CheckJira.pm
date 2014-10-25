@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '1.2.1';
+  $Git::Hooks::CheckJira::VERSION = '1.3.0';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -195,20 +195,30 @@ sub _check_jira_keys {          ## no critic (ProhibitExcessComplexity)
             or $errors++
                 and next KEY;
 
-        if ($unresolved && defined $issue->{fields}{resolution}) {
-            $git->error($PKG, "issue $key is already resolved");
+        if (%issuetype && ! exists $issuetype{$issue->{fields}{issuetype}{name}}) {
+            my @issuetypes = sort keys %issuetype;
+            $git->error(
+                $PKG,
+                "issue $key cannot be used because it is of the unapproved type '$issue->{fields}{issuetype}{name}'",
+                "You can use the following issue types: @issuetypes",
+            );
             $errors++;
             next KEY;
         }
 
         if (%status && ! exists $status{$issue->{fields}{status}{name}}) {
-            $git->error($PKG, "issue $key cannot be used because it is in status '$issue->{fields}{status}{name}'");
+            my @statuses = sort keys %status;
+            $git->error(
+                $PKG,
+                "issue $key cannot be used because it is in the unapproved status '$issue->{fields}{status}{name}'",
+                "The following statuses are approved: @statuses",
+            );
             $errors++;
             next KEY;
         }
 
-        if (%issuetype && ! exists $issuetype{$issue->{fields}{issuetype}{name}}) {
-            $git->error($PKG, "issue $key cannot be used because it is of type '$issue->{fields}{issuetype}{name}'");
+        if ($unresolved && defined $issue->{fields}{resolution}) {
+            $git->error($PKG, "issue $key cannot be used because it is already resolved");
             $errors++;
             next KEY;
         }
@@ -271,7 +281,14 @@ sub check_patchset {
     my $sha1   = $opts->{'--commit'};
     my $commit = $git->get_commit($sha1);
 
-    return check_commit_msg($git, $commit, $opts->{'--branch'});
+    # The --branch argument contains the branch short-name if it's in the
+    # refs/heads/ namespace. But we need to always use the branch long-name,
+    # so we change it here.
+    my $branch = $opts->{'--branch'};
+    $branch = "refs/heads/$branch"
+        unless $branch =~ m:^refs/:;
+
+    return check_commit_msg($git, $commit, $branch);
 }
 
 sub check_message_file {
@@ -356,7 +373,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 1.2.1
+version 1.3.0
 
 =head1 DESCRIPTION
 

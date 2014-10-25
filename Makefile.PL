@@ -52,6 +52,7 @@ my %WriteMakefileArgs = (
     'Cwd' => '0',
     'Data::Dumper' => '0',
     'Data::Util' => '0',
+    'Encode' => '0',
     'Error' => '0',
     'Exporter' => '0',
     'File::Basename' => '0',
@@ -76,7 +77,7 @@ my %WriteMakefileArgs = (
     'URI::file' => '0',
     'lib' => '0'
   },
-  'VERSION' => '1.2.1',
+  'VERSION' => '1.3.0',
   'test' => {
     'TESTS' => 't/*.t'
   },

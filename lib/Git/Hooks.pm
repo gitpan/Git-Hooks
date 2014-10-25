@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '1.2.1';
+  $Git::Hooks::VERSION = '1.3.0';
 }
 # ABSTRACT: Framework for implementing Git (and Gerrit) hooks
 
@@ -441,7 +441,15 @@ sub _prepare_gerrit_ref_update {
     my ($git, $args) = @_;
 
     _prepare_gerrit_args($git, $args);
-    $git->set_affected_ref(@{$args->[0]}{qw/--refname --oldrev --newrev/});
+
+    # The --refname argument contains the branch short-name if it's in the
+    # refs/heads/ namespace. But we need to always use the branch long-name,
+    # so we change it here.
+    my $refname = $args->[0]{'--refname'};
+    $refname = "refs/heads/$refname"
+        unless $refname =~ m:^refs/:;
+
+    $git->set_affected_ref($refname, @{$args->[0]}{qw/--oldrev --newrev/});
     return;
 }
 
@@ -681,7 +689,7 @@ Git::Hooks - Framework for implementing Git (and Gerrit) hooks
 
 =head1 VERSION
 
-version 1.2.1
+version 1.3.0
 
 =head1 SYNOPSIS
 

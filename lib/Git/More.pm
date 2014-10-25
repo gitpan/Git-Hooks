@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '1.2.1';
+  $Git::More::VERSION = '1.3.0';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -13,6 +13,11 @@ use Error qw(:try);
 use Carp;
 use File::Slurp;
 use Git::Hooks qw/:utils/;
+
+# This package variable tells get_config which character encoding is used in
+# the output of the git-config command. Usually none, and decoding isn't
+# necessary. But sometimes it is...
+our $CONFIG_ENCODING = undef;
 
 sub get_config {
     my ($git, $section, $var) = @_;
@@ -44,6 +49,11 @@ EOT
            local $/ = "\c@";
            $git->command(config => '--null', '--list');
         };
+
+        if (defined $CONFIG_ENCODING) {
+            require Encode;
+            $config = Encode::decode($CONFIG_ENCODING, $config);
+        }
 
         if (defined $config) {
             while ($config =~ /([^\cJ]+)\cJ([^\c@]*)\c@/sg) {
@@ -459,7 +469,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 1.2.1
+version 1.3.0
 
 =head1 SYNOPSIS
 
@@ -482,6 +492,20 @@ few extra methods commonly needed by Git hook developers.
 
 In particular, it's used by the standard hooks implemented by the
 C<Git::Hooks> framework.
+
+=head1 CONFIGURATION VARIABLES
+
+=head2 CONFIG_ENCODING
+
+Git configuration files usually contain just ASCII characters, but values
+and sub-section names may contain any characters, except newline. If your
+config files have non-ASCII characters you should ensure that they are
+properly decoded by specifying their encoding like this:
+
+    $Git::More::CONFIG_ENCODING = 'UTF-8';
+
+The acceptable values for this variable are all the encodings supported by
+the C<Encode> module.
 
 =head1 METHODS
 
