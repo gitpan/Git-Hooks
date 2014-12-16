@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '1.3.0';
+  $Git::Hooks::CheckJira::VERSION = '1.4.0';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -373,7 +373,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 1.3.0
+version 1.4.0
 
 =head1 DESCRIPTION
 

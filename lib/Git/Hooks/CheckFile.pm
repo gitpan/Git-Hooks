@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckFile;
 {
-  $Git::Hooks::CheckFile::VERSION = '1.3.0';
+  $Git::Hooks::CheckFile::VERSION = '1.4.0';
 }
 # ABSTRACT: Git::Hooks plugin for checking files
 
@@ -12,9 +12,9 @@ use strict;
 use warnings;
 use Git::Hooks qw/:DEFAULT :utils/;
 use Data::Util qw(:check);
-use File::Basename;
 use File::Slurp;
 use Text::Glob qw/glob_to_regex/;
+use File::Spec::Functions qw/splitpath/;
 use Error qw(:try);
 
 my $PKG = __PACKAGE__;
@@ -45,14 +45,13 @@ sub check_new_files {
     my $errors = 0;
 
     foreach my $file (@files) {
-        my $basename = basename($file);
+        my $basename = (splitpath($file))[2];
         foreach my $command (map {$_->[1]} grep {$basename =~ $_->[0]} @checks) {
-            my $tmp = file_temp($git, $commit, $file)
+            my $tmpfile = file_temp($git, $commit, $file)
                 or ++$errors
                     and next;
 
             # interpolate filename in $command
-            my $tmpfile = $tmp->filename;
             (my $cmd = $command) =~ s/\{\}/\'$tmpfile\'/g;
 
             # execute command and update $errors
@@ -141,7 +140,7 @@ Git::Hooks::CheckFile - Git::Hooks plugin for checking files
 
 =head1 VERSION
 
-version 1.3.0
+version 1.4.0
 
 =head1 DESCRIPTION
 
@@ -185,8 +184,7 @@ The plugin is configured by the following git options.
 This directive tells which COMMAND should be used to check files matching
 PATTERN.
 
-Only the file's L<basename|https://metacpan.org/pod/File::Basename> is
-matched against PATTERN.
+Only the file's basename is matched against PATTERN.
 
 PATTERN is usually expressed with
 L<globbing|https://metacpan.org/pod/File::Glob> to match files based on
@@ -222,7 +220,7 @@ Some real examples:
     git config --add githooks.checkfile.name *.pp    puppet-lint --no-variable_scope-check
     git config --add githooks.checkfile.name *.sh    bash -n
     git config --add githooks.checkfile.name *.sh    shellcheck --exclude=SC2046,SC2053,SC2086
-    git config --add githooks.checkfile.name *.erb   erb -P -x -T - {} | ruby -c | sed '/Syntax OK/d'
+    git config --add githooks.checkfile.name *.erb   erb -P -x -T - {} | ruby -c
 
 =head1 AUTHOR
 

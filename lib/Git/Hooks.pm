@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '1.3.0';
+  $Git::Hooks::VERSION = '1.4.0';
 }
 # ABSTRACT: Framework for implementing Git (and Gerrit) hooks
 
@@ -11,8 +11,8 @@ use Exporter qw/import/;
 use Data::Util qw(:all);
 use File::Slurp;
 use File::Temp qw/tempfile/;
-use File::Basename;
-use File::Spec::Functions;
+use File::Path qw/make_path/;
+use File::Spec::Functions qw/catdir catfile splitpath/;
 use List::MoreUtils qw/uniq/;
 
 our (@EXPORT, @EXPORT_OK, %EXPORT_TAGS); ## no critic (Modules::ProhibitAutomaticExportation)
@@ -36,7 +36,8 @@ BEGIN {                ## no critic (Subroutines::RequireArgUnpacking)
             __PACKAGE__,
             $installer => sub (&) {
                 my ($foo) = @_;
-                $Hooks{$hook}{$foo} ||= sub { $foo->(@_); };
+                my ($package) = get_code_info($foo);
+                $Hooks{$hook}{$foo} ||= [ $package, sub { $foo->(@_); } ];
             }
         );
     }
@@ -113,7 +114,7 @@ sub restore_output {
 sub spawn_external_hook {
     my ($git, $file, $hook, @args) = @_;
 
-    my $prefix  = '[' . __PACKAGE__ . '(' . basename($file) . ')]';
+    my $prefix  = '[' . __PACKAGE__ . '(' . (splitpath($file))[2] . ')]';
     my $saved_output = redirect_output();
 
     if ($hook =~ /^(?:pre-receive|post-receive|pre-push|post-rewrite)$/) {
@@ -189,8 +190,20 @@ sub file_temp {
     my $blob = "$rev:$file";
 
     unless (exists $cache->{$blob}) {
+        $cache->{tmpdir} //= File::Temp->newdir(@args);
+
+        my (undef, $dirname, $basename) = splitpath($file);
+
+        # Create directory path for the temporary file.
+        (my $revdir = $rev) =~ s/^://; # remove ':' from ':0' because Windows don't like ':' in filenames
+        my $dirpath = catdir($cache->{tmpdir}->dirname, $revdir, $dirname);
+        make_path($dirpath);
+
         # create temporary file and copy contents to it
-        my $tmp = File::Temp->new(@args);
+        my $filepath = catfile($dirpath, $basename);
+        open my $tmp, '>:', $filepath ## no critic (RequireBriefOpen)
+            or git->error(__PACKAGE__, "Internal error: can't create file '$filepath': $!")
+                and return;
         my ($pipe, $ctx) = $git->command_output_pipe(qw/cat-file blob/, $blob);
         my $read;
         while ($read = sysread $pipe, my $buffer, 64 * 1024) {
@@ -199,7 +212,7 @@ sub file_temp {
             while ($length) {
                 my $written = syswrite $tmp, $buffer, $length, $offset;
                 defined $written
-                    or $git->error(__PACKAGE__, "Internal error: can't write to '$tmp->filename()': $!")
+                    or $git->error(__PACKAGE__, "Internal error: can't write to '$filepath': $!")
                         and return;
                 $length -= $written;
                 $offset += $written;
@@ -210,7 +223,7 @@ sub file_temp {
                 and return;
         $git->command_close_pipe($pipe, $ctx);
         $tmp->close();
-        $cache->{$blob} = $tmp;
+        $cache->{$blob} = $filepath;
     }
 
     return $cache->{$blob};
@@ -564,7 +577,7 @@ sub _load_plugins {
     my @plugin_dirs = grep {-d} (
         'githooks',
         $git->get_config(githooks => 'plugins'),
-        catfile(dirname($INC{'Git/Hooks.pm'}), 'Hooks'),
+        catfile((splitpath($INC{'Git/Hooks.pm'}))[1], 'Hooks'),
     );
 
     foreach my $plugin (uniq @enabled_plugins) {
@@ -607,7 +620,7 @@ sub _load_plugins {
 sub run_hook {                  ## no critic (Subroutines::ProhibitExcessComplexity)
     my ($hook_name, @args) = @_;
 
-    $hook_name = basename $hook_name;
+    $hook_name = (splitpath($hook_name))[2];
 
     my $git = Git::More->repository();
 
@@ -622,11 +635,20 @@ sub run_hook {                  ## no critic (Subroutines::ProhibitExcessComplex
     _load_plugins($git);
 
     # Call every hook function installed by the hook scripts before.
-    foreach my $hook (values %{$Hooks{$hook_name}}) {
+    foreach my $hook_def (values %{$Hooks{$hook_name}}) {
+        my ($package, $hook) = @$hook_def;
         my $ok = eval { $hook->($git, @args) };
         if (defined $ok) {
             # Modern hooks return a boolean value indicating their success.
             # If they fail they invoke Git::More::error.
+            unless ($ok) {
+                # Let's see if there is a help-on-error message configured
+                # specifically for this plugin.
+                (my $CFG = $package) =~ s/.*::/githooks./;
+                if (my $help = $git->get_config(lc $CFG => 'help-on-error')) {
+                    $git->error($package, $help);
+                }
+            }
         } elsif (length $@) {
             # Old hooks die when they fail...
             $git->error(__PACKAGE__ . "($hook_name)", "Hook failed", $@);
@@ -657,6 +679,11 @@ sub run_hook {                  ## no critic (Subroutines::ProhibitExcessComplex
     }
 
     if (scalar($git->get_errors())) {
+        # Let's see if there is a help-on-error message configured globally.
+        if (my $help = $git->get_config(githooks => 'help-on-error')) {
+            $git->error(__PACKAGE__, $help);
+        }
+
         if (($hook_name eq 'commit-msg' or $hook_name eq 'pre-commit')
                 and not $git->get_config(githooks => 'abort-commit')) {
             warn <<"EOF";
@@ -689,7 +716,7 @@ Git::Hooks - Framework for implementing Git (and Gerrit) hooks
 
 =head1 VERSION
 
-version 1.3.0
+version 1.4.0
 
 =head1 SYNOPSIS
 
@@ -1372,6 +1399,16 @@ a comment like this in addition to casting the vote:
   [Git::Hooks] COMMENT
 
 You may want to use a simple comment like 'OK'.
+
+=head2 githooks.help-on-error MESSAGE
+
+This option allows you to specify a helpful message that will be shown if
+any hook fails. This may be useful, for instance, to provide information to
+users about how to get help from your site's Git gurus.
+
+=head2 githooks.PLUGIN.help-on-error MESSAGE
+
+You can also provide helpful messages specific to each enabled PLUGIN.
 
 =head1 MAIN FUNCTION
 
