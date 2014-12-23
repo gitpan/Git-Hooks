@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '1.4.0';
+  $Git::More::VERSION = '1.5.0';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -269,7 +269,7 @@ sub filter_files_in_index {
     my ($git, $filter) = @_;
     my $output = $git->command(
         qw/diff-index --name-only --no-commit-id --cached -r -z/,
-        "--diff-filter=$filter", 'HEAD',
+        "--diff-filter=$filter", $git->get_head_or_empty_tree(),
     );
     return split /\0/, $output;
 }
@@ -407,11 +407,24 @@ sub get_current_branch {
     my ($git) = @_;
     my $branch;
     try {
-        $branch = $git->command_oneline([qw/symbolic-ref HEAD/], { STDERR => 0});
+        $branch = $git->command_oneline([qw/symbolic-ref HEAD/], {STDERR => 0});
     } otherwise {
         # In dettached head state
     };
     return $branch;
+}
+
+sub get_head_or_empty_tree {
+    my ($git) = @_;
+
+    my $head = 'HEAD';
+    try {
+        scalar($git->command_oneline([qw/rev-parse --verify HEAD/], {STDERR => 0}));
+    } otherwise {
+        # Initial commit: return the empty tree object
+        $head = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+    };
+    return $head;
 }
 
 sub error {
@@ -469,7 +482,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 1.4.0
+version 1.5.0
 
 =head1 SYNOPSIS
 
@@ -814,6 +827,15 @@ by the C<git symbolic-ref HEAD> command.
 
 If the repository is in a dettached head state, i.e., if HEAD points
 to a commit instead of to a branch, the method returns undef.
+
+=head2 get_head_or_empty_tree
+
+This method returns the string "HEAD" if the repository already has
+commits. Otherwise, if it is a brand new repository, it returns the SHA1
+representing the empty tree. It's useful to come up with the correct
+argument for, e.g., C<git diff> during a pre-commit hook. (See the default
+pre-commit.sample script which comes with Git to understand how this is
+used.)
 
 =head2 error PREFIX MESSAGE [DETAILS]
 

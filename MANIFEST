@@ -16,6 +16,7 @@ lib/Git/Hooks/CheckJira.pm
 lib/Git/Hooks/CheckLog.pm
 lib/Git/Hooks/CheckRewrite.pm
 lib/Git/Hooks/CheckStructure.pm
+lib/Git/Hooks/CheckWhitespace.pm
 lib/Git/Hooks/GerritChangeId.pm
 lib/Git/More.pm
 lib/Git/More/Message.pm
@@ -27,6 +28,7 @@ t/02-check-jira.t
 t/02-check-log.t
 t/02-check-rewrite.t
 t/02-check-structure.t
+t/02-check-whitespace.t
 t/02-externals.t
 t/02-gerrit-change-id.t
 t/02-noplugin.t

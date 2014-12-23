@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckFile;
 {
-  $Git::Hooks::CheckFile::VERSION = '1.4.0';
+  $Git::Hooks::CheckFile::VERSION = '1.5.0';
 }
 # ABSTRACT: Git::Hooks plugin for checking files
 
@@ -12,7 +12,6 @@ use strict;
 use warnings;
 use Git::Hooks qw/:DEFAULT :utils/;
 use Data::Util qw(:check);
-use File::Slurp;
 use Text::Glob qw/glob_to_regex/;
 use File::Spec::Functions qw/splitpath/;
 use Error qw(:try);
@@ -140,7 +139,7 @@ Git::Hooks::CheckFile - Git::Hooks plugin for checking files
 
 =head1 VERSION
 
-version 1.4.0
+version 1.5.0
 
 =head1 DESCRIPTION
 
