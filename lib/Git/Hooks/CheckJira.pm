@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckJira;
 {
-  $Git::Hooks::CheckJira::VERSION = '1.5.0';
+  $Git::Hooks::CheckJira::VERSION = '1.6.0';
 }
 # ABSTRACT: Git::Hooks plugin which requires citation of JIRA issues in commit messages.
 
@@ -11,7 +11,7 @@ use utf8;
 use strict;
 use warnings;
 use Git::Hooks qw/:DEFAULT :utils/;
-use File::Slurp;
+use Path::Tiny;
 use Data::Util qw(:check);
 use List::MoreUtils qw/uniq/;
 use JIRA::REST;
@@ -299,8 +299,9 @@ sub check_message_file {
     my $current_branch = $git->get_current_branch();
     return 1 unless is_ref_enabled($current_branch, $git->get_config($CFG => 'ref'));
 
-    my $msg = read_file($commit_msg_file)
-        or $git->error($PKG, "cannot open file '$commit_msg_file' for reading: $!")
+    my $msg = eval { path($commit_msg_file)->slurp };
+    defined $msg
+        or $git->error($PKG, "cannot open file '$commit_msg_file' for reading: $@")
             and return 0;
 
     # Remove comment lines from the message file contents.
@@ -373,7 +374,7 @@ Git::Hooks::CheckJira - Git::Hooks plugin which requires citation of JIRA issues
 
 =head1 VERSION
 
-version 1.5.0
+version 1.6.0
 
 =head1 DESCRIPTION
 
@@ -446,18 +447,6 @@ The refs can be specified as a complete ref name
 (e.g. "refs/heads/master") or by a regular expression starting with a
 caret (C<^>), which is kept as part of the regexp
 (e.g. "^refs/heads/(master|fix)").
-
-=head2 githooks.checkjira.userenv STRING
-
-This variable is deprecated. Please, use the C<githooks.userenv>
-variable, which is defined in the Git::Hooks module. Please, see its
-documentation to understand it.
-
-=head2 githooks.checkjira.admin USERSPEC
-
-This variable is deprecated. Please, use the C<githooks.admin>
-variable, which is defined in the Git::Hooks module. Please, see its
-documentation to understand it.
 
 =head2 githooks.checkjira.jiraurl URL
 
@@ -700,7 +689,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2014 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2015 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

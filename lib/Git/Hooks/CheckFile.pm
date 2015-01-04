@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckFile;
 {
-  $Git::Hooks::CheckFile::VERSION = '1.5.0';
+  $Git::Hooks::CheckFile::VERSION = '1.6.0';
 }
 # ABSTRACT: Git::Hooks plugin for checking files
 
@@ -13,7 +13,7 @@ use warnings;
 use Git::Hooks qw/:DEFAULT :utils/;
 use Data::Util qw(:check);
 use Text::Glob qw/glob_to_regex/;
-use File::Spec::Functions qw/splitpath/;
+use Path::Tiny;
 use Error qw(:try);
 
 my $PKG = __PACKAGE__;
@@ -44,9 +44,9 @@ sub check_new_files {
     my $errors = 0;
 
     foreach my $file (@files) {
-        my $basename = (splitpath($file))[2];
+        my $basename = path($file)->basename;
         foreach my $command (map {$_->[1]} grep {$basename =~ $_->[0]} @checks) {
-            my $tmpfile = file_temp($git, $commit, $file)
+            my $tmpfile = $git->blob($commit, $file)
                 or ++$errors
                     and next;
 
@@ -139,7 +139,7 @@ Git::Hooks::CheckFile - Git::Hooks plugin for checking files
 
 =head1 VERSION
 
-version 1.5.0
+version 1.6.0
 
 =head1 DESCRIPTION
 
@@ -227,7 +227,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2014 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2015 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '1.5.0';
+  $Git::More::VERSION = '1.6.0';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -11,8 +11,10 @@ use parent 'Git';
 
 use Error qw(:try);
 use Carp;
-use File::Slurp;
+use Path::Tiny;
 use Git::Hooks qw/:utils/;
+use File::Path qw/make_path/;
+use File::Spec::Functions qw/catdir catfile splitpath/;
 
 # This package variable tells get_config which character encoding is used in
 # the output of the git-config command. Usually none, and decoding isn't
@@ -219,10 +221,10 @@ sub read_commit_msg_file {
 
     my $encoding = $git->get_config(i18n => 'commitencoding') || 'utf-8';
 
-    my $msg_ref = read_file($msgfile, {binmode => ":encoding($encoding)", scalar_ref => 1});
+    my $msg = path($msgfile)->slurp({binmode => ":encoding($encoding)"});
 
     # Truncate the message just before the diff, if any.
-    $$msg_ref =~ s:\ndiff --git .*::s;
+    $msg =~ s:\ndiff --git .*::s;
 
     # The comments in the following lines were taken from the "git
     # help stripspace" documentation to guide the
@@ -231,7 +233,7 @@ sub read_commit_msg_file {
     # but it seems that it doesn't work on FreeBSD. So, we reimplement
     # its functionality here.
 
-    for ($$msg_ref) {
+    for ($msg) {
         # Skip and remove all lines starting with comment character
         # (default #).
         s/^#.*//gm;
@@ -252,7 +254,7 @@ sub read_commit_msg_file {
         s/^\s+$//s;
     }
 
-    return $$msg_ref;
+    return $msg;
 }
 
 sub write_commit_msg_file {
@@ -260,7 +262,7 @@ sub write_commit_msg_file {
 
     my $encoding = $git->get_config(i18n => 'commitencoding') || 'utf-8';
 
-    write_file($msgfile, {binmode => ":encoding($encoding)"}, @msg);
+    path($msgfile)->spew({binmode => ":encoding($encoding)"}, @msg);
 
     return;
 }
@@ -427,6 +429,54 @@ sub get_head_or_empty_tree {
     return $head;
 }
 
+sub blob {
+    my ($git, $rev, $file, @args) = @_;
+
+    my $cache = $git->cache('blob');
+
+    my $blob = "$rev:$file";
+
+    unless (exists $cache->{$blob}) {
+        $cache->{tmpdir} //= Path::Tiny->tempdir(@args);
+
+        my $path = path($file);
+
+        # Calculate temporary file path
+        (my $revdir  = $rev) =~ s/^://; # remove ':' from ':0' because Windows don't like ':' in filenames
+        my $filepath = $cache->{tmpdir}->child($revdir, $path);
+
+        # Create directory path for the temporary file.
+        $filepath->parent->mkpath;
+
+        # Create temporary file and copy contents to it
+        open my $tmp, '>:', $filepath ## no critic (RequireBriefOpen)
+            or git->error(__PACKAGE__, "Internal error: can't create file '$filepath': $!")
+                and return;
+        my ($pipe, $ctx) = $git->command_output_pipe(qw/cat-file blob/, $blob);
+        my $read;
+        while ($read = sysread $pipe, my $buffer, 64 * 1024) {
+            my $length = length $buffer;
+            my $offset = 0;
+            while ($length) {
+                my $written = syswrite $tmp, $buffer, $length, $offset;
+                defined $written
+                    or $git->error(__PACKAGE__, "Internal error: can't write to '$filepath': $!")
+                        and return;
+                $length -= $written;
+                $offset += $written;
+            }
+        }
+        defined $read
+            or $git->error(__PACKAGE__, "Internal error: can't read from git cat-file pipe: $!")
+                and return;
+        $git->command_close_pipe($pipe, $ctx);
+        $tmp->close();
+        $cache->{$blob} = $filepath;
+    }
+
+    return $cache->{$blob}->stringify;
+}
+
 sub error {
     my ($git, $prefix, $message, $details) = @_;
     $message =~ s/\n*$//s;    # strip trailing newlines
@@ -482,7 +532,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 1.5.0
+version 1.6.0
 
 =head1 SYNOPSIS
 
@@ -837,6 +887,23 @@ argument for, e.g., C<git diff> during a pre-commit hook. (See the default
 pre-commit.sample script which comes with Git to understand how this is
 used.)
 
+=head2 blob REV, FILE, ARGS...
+
+This method returns the name of a temporary file into which the contents of
+the file FILE in revision REV has been copied.
+
+It's useful for hooks that need to read the contents of changed files in
+order to check anything in them.
+
+These objects are cached so that if more than one hook needs to get at them
+they're created only once.
+
+By default, all temporary files are removed when the Git::More object is
+destroyed.
+
+Any remaining ARGS are passed as arguments to C<File::Temp::newdir> so that you
+can have more control over the temporary file creation.
+
 =head2 error PREFIX MESSAGE [DETAILS]
 
 This method should be used by plugins to record consistent error or warning
@@ -884,7 +951,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2014 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2015 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

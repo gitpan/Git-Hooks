@@ -55,13 +55,12 @@ my %WriteMakefileArgs = (
     'Encode' => '0',
     'Error' => '0',
     'Exporter' => '0',
-    'File::Path' => '2.08',
-    'File::Slurp' => '0',
+    'File::Path' => '0',
     'File::Spec::Functions' => '0',
-    'File::Temp' => '0',
     'Gerrit::REST' => '0',
     'Git' => '0',
     'List::MoreUtils' => '0',
+    'Path::Tiny' => '0',
     'Text::Glob' => '0',
     'parent' => '0',
     'strict' => '0',
@@ -70,14 +69,12 @@ my %WriteMakefileArgs = (
   },
   'TEST_REQUIRES' => {
     'Cwd' => '0',
-    'File::Path' => '2.08',
-    'File::Remove' => '0',
     'File::pushd' => '0',
     'Test::More' => '0',
     'URI::file' => '0',
     'lib' => '0'
   },
-  'VERSION' => '1.5.0',
+  'VERSION' => '1.6.0',
   'test' => {
     'TESTS' => 't/*.t'
   },

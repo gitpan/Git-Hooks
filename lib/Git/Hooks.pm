@@ -1,18 +1,16 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '1.5.0';
+  $Git::Hooks::VERSION = '1.6.0';
 }
 # ABSTRACT: Framework for implementing Git (and Gerrit) hooks
 
 use 5.010;
 use strict;
 use warnings;
+use Carp;
 use Exporter qw/import/;
 use Data::Util qw(:all);
-use File::Slurp;
-use File::Temp qw/tempfile/;
-use File::Path qw/make_path/;
-use File::Spec::Functions qw/catdir catfile splitpath/;
+use Path::Tiny;
 use List::MoreUtils qw/uniq/;
 
 our (@EXPORT, @EXPORT_OK, %EXPORT_TAGS); ## no critic (Modules::ProhibitAutomaticExportation)
@@ -87,7 +85,7 @@ sub redirect_output {
     ## no critic (RequireBriefOpen, RequireCarping)
     open(my $oldout, '>&', \*STDOUT)  or die "Can't dup STDOUT: $!";
     open(my $olderr, '>&', \*STDERR)  or die "Can't dup STDERR: $!";
-    my ($tempfh, $tempfile) = tempfile(UNLINK => 1);
+    my $tempfile = Path::Tiny->tempfile(UNLINK => 1);
     open(STDOUT    , '>' , $tempfile) or die "Can't redirect STDOUT to \$tempfile: $!";
     open(STDERR    , '>&', \*STDOUT)  or die "Can't dup STDOUT for STDERR: $!";
     ## use critic
@@ -105,7 +103,7 @@ sub restore_output {
     open(STDOUT, '>&', $oldout) or die "Can't dup \$oldout: $!";
     open(STDERR, '>&', $olderr) or die "Can't dup \$olderr: $!";
     ## use critic
-    return read_file($tempfile);
+    return $tempfile->slurp;
 }
 
 # This is an internal routine used to invoke external hooks, feed them
@@ -114,7 +112,7 @@ sub restore_output {
 sub spawn_external_hook {
     my ($git, $file, $hook, @args) = @_;
 
-    my $prefix  = '[' . __PACKAGE__ . '(' . (splitpath($file))[2] . ')]';
+    my $prefix  = '[' . __PACKAGE__ . '(' . path($file)->basename . ')]';
     my $saved_output = redirect_output();
 
     if ($hook =~ /^(?:pre-receive|post-receive|pre-push|post-rewrite)$/) {
@@ -185,48 +183,9 @@ sub spawn_external_hook {
 sub file_temp {
     my ($git, $rev, $file, @args) = @_;
 
-    state $cache = {};
+    carp 'Invoking deprecated routine ', __PACKAGE__, '::file_temp. Please, see documentation.';
 
-    my $blob = "$rev:$file";
-
-    unless (exists $cache->{$blob}) {
-        $cache->{tmpdir} //= File::Temp->newdir(@args);
-
-        my (undef, $dirname, $basename) = splitpath($file);
-
-        # Create directory path for the temporary file.
-        (my $revdir = $rev) =~ s/^://; # remove ':' from ':0' because Windows don't like ':' in filenames
-        my $dirpath = catdir($cache->{tmpdir}->dirname, $revdir, $dirname);
-        make_path($dirpath);
-
-        # create temporary file and copy contents to it
-        my $filepath = catfile($dirpath, $basename);
-        open my $tmp, '>:', $filepath ## no critic (RequireBriefOpen)
-            or git->error(__PACKAGE__, "Internal error: can't create file '$filepath': $!")
-                and return;
-        my ($pipe, $ctx) = $git->command_output_pipe(qw/cat-file blob/, $blob);
-        my $read;
-        while ($read = sysread $pipe, my $buffer, 64 * 1024) {
-            my $length = length $buffer;
-            my $offset = 0;
-            while ($length) {
-                my $written = syswrite $tmp, $buffer, $length, $offset;
-                defined $written
-                    or $git->error(__PACKAGE__, "Internal error: can't write to '$filepath': $!")
-                        and return;
-                $length -= $written;
-                $offset += $written;
-            }
-        }
-        defined $read
-            or $git->error(__PACKAGE__, "Internal error: can't read from git cat-file pipe: $!")
-                and return;
-        $git->command_close_pipe($pipe, $ctx);
-        $tmp->close();
-        $cache->{$blob} = $filepath;
-    }
-
-    return $cache->{$blob};
+    return $git->blob($rev, $file, @args);
 }
 
 sub grok_groups_spec {
@@ -265,7 +224,7 @@ sub grok_groups {
         my $groups = {};
         foreach my $spec (@groups) {
             if (my ($groupfile) = ($spec =~ /^file:(.*)/)) {
-                my @groupspecs = read_file($groupfile);
+                my @groupspecs = path($groupfile)->lines;
                 defined $groupspecs[0]
                     or die __PACKAGE__, ": can't open groups file ($groupfile): $!\n";
                 grok_groups_spec($groups, \@groupspecs, $groupfile);
@@ -577,7 +536,7 @@ sub _load_plugins {
     my @plugin_dirs = grep {-d} (
         'githooks',
         $git->get_config(githooks => 'plugins'),
-        catfile((splitpath($INC{'Git/Hooks.pm'}))[1], 'Hooks'),
+        path($INC{'Git/Hooks.pm'})->parent->child('Hooks'),
     );
 
     foreach my $plugin (uniq @enabled_plugins) {
@@ -596,7 +555,7 @@ sub _load_plugins {
                 # Otherwise, it's a basename that we must look for
                 # in @plugin_dirs
                 $plugin .= '.pm' unless $plugin =~ /\.p[lm]$/i;
-                my @scripts = grep {-f} map {catfile($_, $plugin)} @plugin_dirs;
+                my @scripts = grep {-f} map {path($_)->child($plugin)} @plugin_dirs;
                 my $script = shift @scripts
                     or die __PACKAGE__, ": can't find enabled hook $plugin.\n";
                 $plugin = $script; # for the error messages below
@@ -620,7 +579,7 @@ sub _load_plugins {
 sub run_hook {                  ## no critic (Subroutines::ProhibitExcessComplexity)
     my ($hook_name, @args) = @_;
 
-    $hook_name = (splitpath($hook_name))[2];
+    $hook_name = path($hook_name)->basename;
 
     my $git = Git::More->repository();
 
@@ -660,13 +619,13 @@ sub run_hook {                  ## no critic (Subroutines::ProhibitExcessComplex
     # Invoke enabled external hooks. This doesn't work in Windows yet.
     if ($^O ne 'MSWin32' && $git->get_config(githooks => 'externals')) {
         foreach my $dir (
-            grep {-e} map {catfile($_, $hook_name)}
-                ($git->get_config(githooks => 'hooks'), catfile($git->repo_path(), 'hooks.d'))
+            grep {-e} map {path($_)->child($hook_name)}
+                ($git->get_config(githooks => 'hooks'), path($git->repo_path())->child('hooks.d'))
         ) {
             opendir my $dh, $dir
                 or $git->error(__PACKAGE__, ": cannot opendir '$dir'", $!)
                     and next;
-            foreach my $file (grep {-f && -x} map {catfile($dir, $_)} readdir $dh) {
+            foreach my $file (grep {-f && -x} map {path($dir)->child($_)} readdir $dh) {
                 spawn_external_hook($git, $file, $hook_name, @args)
                     or $git->error(__PACKAGE__, ": error in external hook '$file'");
             }
@@ -716,7 +675,7 @@ Git::Hooks - Framework for implementing Git (and Gerrit) hooks
 
 =head1 VERSION
 
-version 1.5.0
+version 1.6.0
 
 =head1 SYNOPSIS
 
@@ -766,19 +725,19 @@ site.
 A L<Git hook|http://schacon.github.com/git/githooks.html> is a
 specifically named program that is called by the git program during
 the execution of some operations. At the last count, there were
-exactly 16 different hooks which can be used. They must reside under
+17 different hooks. They must be kept under
 the C<.git/hooks> directory in the repository. When you create a new
 repository, you get some template files in this directory, all of them
 having the C<.sample> suffix and helpful instructions inside
 explaining how to convert them into working hooks.
 
-When Git is performing a commit operation, for example, it calls these
-four hooks in order: C<pre-commit>, C<prepare-commit-msg>,
-C<commit-msg>, and C<post-commit>. The first three can gather all
-sorts of information about the specific commit being performed and
-decide to reject it in case it doesn't comply to specified
-policies. The C<post-commit> can be used to log or alert interested
-parties about the commit just done.
+When Git is performing a commit operation, for example, it calls these four
+hooks in order: C<pre-commit>, C<prepare-commit-msg>, C<commit-msg>, and
+C<post-commit>. The first can gather all sorts of information about the
+specific commit being performed and decide to reject it in case it doesn't
+comply to specified policies. The next two can be used to format or check
+the commit message.  The C<post-commit> can be used to log or alert
+interested parties about the commit just performed.
 
 There are several useful hook scripts available elsewhere, e.g.
 L<https://github.com/gitster/git/tree/master/contrib/hooks> and
@@ -802,7 +761,7 @@ This arrangement is inefficient in two ways. First because each script
 runs as a separate process, which usually have a high start up cost
 because they are, well, scripts and not binaries. (For a dissent view
 on this, see
-L<this|http://gnustavo.wordpress.com/2012/06/28/programming-languages-start-up-times/>.)
+L<this|http://blog.gnustavo.com/2013/07/programming-languages-startup-times.html>.)
 And second, because as each script is called in turn they have no
 memory of the scripts called before and have to gather the information
 about the transaction again and again, normally by calling the C<git>
@@ -855,7 +814,7 @@ are interested in. For example, if you are interested in a
 C<commit-msg> hook, create a symbolic link called C<commit-msg>
 pointing to the C<git-hooks.pl> file. This way, Git will invoke the
 generic script for all hooks you are interested in. (You may create
-symbolic links for all 16 hooks, but this will make Git call the
+symbolic links for all hooks, but this will make Git call the
 script for all hooked operations, even for those that you may not be
 interested in. Nothing wrong will happen, but the server will be doing
 extra work for nothing.)
@@ -1657,21 +1616,21 @@ every output since the previous call to redirect_output.
 
 =head2 file_temp REV, FILE, ARGS...
 
-This routine returns a C<File::Temp> object representing a temporary file
-into which the contents of the file FILE in revision REV has been copied.
+This routine is DEPRECATED and has been replaced by the L<Git::More::blob> method.
 
-The object's filehandle is closed before being returned.
+This routine returns the name of a temporary file into which the contents of
+the file FILE in revision REV has been copied.
 
 It's useful for hooks that need to read the contents of changed files in
 order to check anything in them.
 
-These objects are cached so that if more than one hook needs to get at them
+These files are cached so that if more than one hook needs to get at them
 they're created only once.
 
 By default, all temporary files are removed when the hook exits.
 
-Any remaining ARGS are passed as arguments to C<File::Temp::new> so that you
-can have more control over the temporary file creation.
+Any remaining ARGS are passed as arguments to C<Path::Tiny::tempfile> so
+that you can have more control over the temporary file creation.
 
 =head1 SEE ALSO
 
@@ -1697,7 +1656,7 @@ Gustavo L. de M. Chaves <gnustavo@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2014 by CPqD <www.cpqd.com.br>.
+This software is copyright (c) 2015 by CPqD <www.cpqd.com.br>.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
