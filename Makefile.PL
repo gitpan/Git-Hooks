@@ -50,13 +50,10 @@ my %WriteMakefileArgs = (
   'PREREQ_PM' => {
     'Carp' => '0',
     'Cwd' => '0',
-    'Data::Dumper' => '0',
     'Data::Util' => '0',
     'Encode' => '0',
     'Error' => '0',
     'Exporter' => '0',
-    'File::Path' => '0',
-    'File::Spec::Functions' => '0',
     'Gerrit::REST' => '0',
     'Git' => '0',
     'List::MoreUtils' => '0',
@@ -74,7 +71,7 @@ my %WriteMakefileArgs = (
     'URI::file' => '0',
     'lib' => '0'
   },
-  'VERSION' => '1.6.0',
+  'VERSION' => '1.6.1',
   'test' => {
     'TESTS' => 't/*.t'
   },

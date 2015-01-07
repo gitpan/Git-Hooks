@@ -1,6 +1,6 @@
 package Git::Hooks;
 {
-  $Git::Hooks::VERSION = '1.6.0';
+  $Git::Hooks::VERSION = '1.6.1';
 }
 # ABSTRACT: Framework for implementing Git (and Gerrit) hooks
 
@@ -455,12 +455,8 @@ sub _gerrit_patchset_post_hook {
         }
     }
 
-    my $eval = eval { $args->{gerrit}->POST($resource, \%params) };
-    unless ($eval) {
-        my $error = $@;
-        require Data::Dumper;
-        die __PACKAGE__ . ": error in Gerrit::REST::POST(\n" . Data::Dumper::Dumper($resource, \%params) . ")\n: $error\n";
-    }
+    eval { $args->{gerrit}->POST($resource, \%params) }
+        or die __PACKAGE__ . ": error in Gerrit::REST::POST($resource): $@\n";
 
     return;
 }
@@ -675,7 +671,7 @@ Git::Hooks - Framework for implementing Git (and Gerrit) hooks
 
 =head1 VERSION
 
-version 1.6.0
+version 1.6.1
 
 =head1 SYNOPSIS
 

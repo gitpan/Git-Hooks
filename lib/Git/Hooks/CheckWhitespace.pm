@@ -2,7 +2,7 @@
 
 package Git::Hooks::CheckWhitespace;
 {
-  $Git::Hooks::CheckWhitespace::VERSION = '1.6.0';
+  $Git::Hooks::CheckWhitespace::VERSION = '1.6.1';
 }
 # ABSTRACT: Git::Hooks plugin for checking whitespace errors
 
@@ -105,7 +105,7 @@ Git::Hooks::CheckWhitespace - Git::Hooks plugin for checking whitespace errors
 
 =head1 VERSION
 
-version 1.6.0
+version 1.6.1
 
 =head1 DESCRIPTION
 

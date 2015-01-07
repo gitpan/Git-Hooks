@@ -1,6 +1,6 @@
 package Git::More;
 {
-  $Git::More::VERSION = '1.6.0';
+  $Git::More::VERSION = '1.6.1';
 }
 # ABSTRACT: A Git extension with some goodies for hook developers.
 
@@ -13,8 +13,6 @@ use Error qw(:try);
 use Carp;
 use Path::Tiny;
 use Git::Hooks qw/:utils/;
-use File::Path qw/make_path/;
-use File::Spec::Functions qw/catdir catfile splitpath/;
 
 # This package variable tells get_config which character encoding is used in
 # the output of the git-config command. Usually none, and decoding isn't
@@ -345,8 +343,7 @@ sub get_affected_ref_commit_ids {
         or die __PACKAGE__, ": get_affected_ref_commit_ids($ref): no such affected ref\n";
 
     unless (exists $affected->{$ref}{ids}) {
-        my @range = $git->get_affected_ref_range($ref);
-        $affected->{$ref}{ids} = [$git->command('rev-list' => join('..', @range))];
+        $affected->{$ref}{ids} = [ map { $_->{'commit'} } $git->get_affected_ref_commits($ref) ];
     }
 
     return @{$affected->{$ref}{ids}};
@@ -532,7 +529,7 @@ Git::More - A Git extension with some goodies for hook developers.
 
 =head1 VERSION
 
-version 1.6.0
+version 1.6.1
 
 =head1 SYNOPSIS
 
